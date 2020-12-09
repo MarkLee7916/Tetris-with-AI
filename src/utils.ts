@@ -1,6 +1,6 @@
 // Generates a random integer whose value lies between lower and upper
 export function randomIntBetween(lower: number, upper: number) {
-	return Math.floor(seededRandom() * (upper - lower)) + lower;
+	return Math.floor(Math.random() * (upper - lower)) + lower;
 }
 
 export function randomItemFromArray <T> (array: T[]): T {
@@ -21,6 +21,7 @@ export function sliceLastChar(str: string) {
     return str.slice(0, str.length - 1);
 }
 
+// Only used in development to seed the random number generator
 let seed = 6;
 function seededRandom() {
     const x = Math.sin(seed++) * 10000;
