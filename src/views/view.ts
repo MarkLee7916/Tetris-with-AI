@@ -1,23 +1,29 @@
 import { HEIGHT, WIDTH } from "../controllers/controller";
 
+
 export const enum ViewMessages {
     MoveLeft,
     MoveRight,
     MoveDown,
     Rotate,
-    Hold
+    Hold,
+    ToggleAI
 }
 
 const WALL_COLOR = "white";
 const PLACEHOLDER = "pink";
+const ACTIVE_BUTTON_COLOR = "#7FDBFF";
+const DEFAULT_BUTTON_COLOR = "white";
 const PREVIEW_DISPLAY_SIZE = 4;
 
 let notifyController: (message: ViewMessages, content: any) => void;
+let lineClears = 0;
 
 export function initView(notif: (message: ViewMessages, content: any) => void) {
     initGridInDOM();
     initHoldBlockDisplayDOM();
     initNextBlockDisplayDOM();
+    initStyles();
     initEventListeners();
 
     notifyController = notif;
@@ -37,7 +43,8 @@ export function replaceGridRowDOM(row: number) {
     const gridDOM = <HTMLTableElement> getDOMElem("#grid");
 
     gridDOM.deleteRow(row);
-	gridDOM.insertBefore(createEmptyRowInDOM(WIDTH), gridDOM.rows[0]);
+    gridDOM.insertBefore(createEmptyRowInDOM(WIDTH), gridDOM.rows[0]);
+    updateLineClearCounter();
 }
 
 export function clearNextBlockDOM() {
@@ -56,6 +63,16 @@ export function fillHoldBlockTileDOM([row, col]: [number, number]) {
     fillTileDOM(row, col, "#hold-block");
 }
 
+export function gameOverMessage() {
+    alert(`Game over. You got ${lineClears} line clears`);
+}
+
+function updateLineClearCounter() {
+    const lineClearCounter = getDOMElem("#line-clears");
+    
+    lineClearCounter.innerHTML = `Line Clears: ${++lineClears}`
+}
+
 function clearBlockDOM(height: number, width: number, selector: string) {
     for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
@@ -66,6 +83,12 @@ function clearBlockDOM(height: number, width: number, selector: string) {
     }
 }
 
+function initStyles() {
+    const toggleAIButtonDOM = <HTMLButtonElement> getDOMElem("#toggle-ai");
+
+    toggleAIButtonDOM.style.color = ACTIVE_BUTTON_COLOR;
+}
+
 function fillTileDOM(row: number, col: number, selector: string) {
     const elemDOM = getTileInDOM(row, col, selector)
 
@@ -73,19 +96,19 @@ function fillTileDOM(row: number, col: number, selector: string) {
 }
 
 function initHoldBlockDisplayDOM() {
-    initGeneric(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
+    initGenericTable(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
 }
 
 function initNextBlockDisplayDOM() {
-    initGeneric(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
+    initGenericTable(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
 }
 
 // Dynamically generate HTML for a plain grid
 function initGridInDOM() {
-    initGeneric(HEIGHT, WIDTH, "#grid");
+    initGenericTable(HEIGHT, WIDTH, "#grid");
 }
 
-function initGeneric(height: number, width: number, selector: string) {
+function initGenericTable(height: number, width: number, selector: string) {
     const elemDOM = getDOMElem(selector);
 
 	for (let row = 0; row < height; row++) {
@@ -98,6 +121,22 @@ function initEventListeners() {
 
     getDOMElem("#hold").addEventListener("click", () => notifyController(ViewMessages.Hold, null));
     getDOMElem("#reset").addEventListener("click", () => location.reload());
+    getDOMElem("#toggle-ai").addEventListener("click", toggleAI)
+}
+
+function toggleAI(event: Event) {
+    const toggleAIButtonDOM = <HTMLButtonElement> event.target;
+
+    toggleButtonColor(toggleAIButtonDOM);
+    notifyController(ViewMessages.ToggleAI, null);
+}
+
+function toggleButtonColor(toggleAIButtonDOM: HTMLButtonElement) {
+    if (toggleAIButtonDOM.style.color === DEFAULT_BUTTON_COLOR) {
+        toggleAIButtonDOM.style.color = ACTIVE_BUTTON_COLOR;
+    } else {
+        toggleAIButtonDOM.style.color = DEFAULT_BUTTON_COLOR;
+    }
 }
 
 // Map key press onto action
@@ -176,7 +215,7 @@ function getDOMElem(selector: string) {
     const elemDOM: Element | null = document.querySelector(selector);
 
     if (elemDOM === null) {
-        throw `Error querying selector ${selector} `
+        throw `Selector ${selector} wasn't found in index.html`;
     } else {
         return <Element> elemDOM;
     }

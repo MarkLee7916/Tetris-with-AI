@@ -1,6 +1,6 @@
 import { HEIGHT, WIDTH } from "../controllers/controller";
-import { deepCopy, wait } from "../utils";
-import { clearRow, fillAt, isFilledAt } from "./grid";
+import { wait } from "../utils";
+import { clearRow, fillAt, initEmptyGrid, isFilledAt } from "./grid";
 import { Tetrimino } from "./tetrimino";
 
 export const enum GameMessages {
@@ -14,41 +14,43 @@ export const enum GameMessages {
     ClearGrid
 }
 
-let notifyController: (message: GameMessages, arg: any) => void;
+const delayTime = 0;
 
-let nextTetrimino: Tetrimino = new Tetrimino();
+let notifyController: (message: GameMessages, arg: any) => void;
+let nextTetrimino: Tetrimino;
 let holdingTetrimino: Tetrimino;
 let currTetrimino: Tetrimino;
-
 let currRow: number;
 let currCol: number;
+let isAIRunning: boolean;
 
 export function initGame(notif: (message: GameMessages, arg: any) => void) {
+    initEmptyGrid();
+
+    nextTetrimino = new Tetrimino();
+    isAIRunning = true;
     notifyController = notif;
 }
 
-export async function fallingBlock() {    
-    currRow = 0;
-    currCol = WIDTH / 2;
-    currTetrimino = nextTetrimino;
-    nextTetrimino = new Tetrimino();
+export function toggleAI() {
+    isAIRunning = isAIRunning ? false : true;
+}
 
-    // PUT AI CODE OUTSIDE OF THIS FUNCTION LATER
-    const [optimalCol, optimalRotations] = computeOptimalMove();
-    currCol = optimalCol;
+export async function fall() {    
+    configureNewTetrimino();
 
-    for (let i = 0; i < optimalRotations; i++) {
-        currTetrimino.nextRotation();
-    } 
-
-    renderNextBlock();
-
-    while (canMoveDown(currTetrimino, currRow, currCol)) {        
-        moveDown();
-        await wait();
+    if (isAIRunning) {
+        runAI();
     }
 
-    updateGridWithBlock();
+    renderNextPreview();
+
+    while (canMoveTetriminoDown(currTetrimino, currRow, currCol)) {        
+        moveCurrTetriminoDown();
+        await wait(delayTime);
+    }
+
+    updateGridWithTetrimino();
 	handleLineClears();
 }
 
@@ -62,59 +64,55 @@ export function isGameOver() {
 	return false;
 }
 
-export function rotatePiece() {
-	renderClearBlock();
+export function rotateCurrTetrimino() {
+	renderClearTetrimino();
 	currTetrimino.nextRotation();
 
 	if (!noCollisions(currTetrimino, currRow, currCol)) {
         currTetrimino.prevRotation();
     }
 
-	renderBlock();
+	renderTetrimino();
 }
 
-export function moveLeft() {
-	moveBlock(0, -1, (i: number) => currTetrimino.colAt(i) + currCol <= 0);
+export function moveCurrTetriminoLeft() {
+	moveCurrTetrimino(0, -1, (i: number) => currTetrimino.colAt(i) + currCol <= 0);
 }
 
-export function moveRight() {
-	moveBlock(0, 1, i => currTetrimino.colAt(i) + currCol >= WIDTH - 1);
+export function moveCurrTetriminoRight() {
+	moveCurrTetrimino(0, 1, i => currTetrimino.colAt(i) + currCol >= WIDTH - 1);
 }
 
-export function moveDown() {
-	moveBlock(1, 0, i => currTetrimino.rowAt(i) + currRow  >= HEIGHT - 1);
+export function moveCurrTetriminoDown() {
+	moveCurrTetrimino(1, 0, i => currTetrimino.rowAt(i) + currRow  >= HEIGHT - 1);
 }
 
-export function holdTetrimino() {
-    if (canHoldTetrimino()) {
-        renderClearBlock();
+export function hold() {
+    if (canHold()) {
+        renderClearTetrimino();
 
-        swapWithHoldingTetrimino();
+        swapWithHold();
 
-        renderHoldBlock();
-        renderBlock();
+        renderHoldPreview();
+        renderTetrimino();
     }
 }
 
-// NEEDS FIXED
 export function computeOptimalMove(): [number, number] {
     let maxRotation = Number.MIN_SAFE_INTEGER
     let maxCol = Number.MIN_SAFE_INTEGER;
-    let maxVal = Number.MIN_SAFE_INTEGER;
+    let maxHeuristic = Number.MIN_SAFE_INTEGER;
 
     for (let col = 0; col < WIDTH; col++) {
-        for (let rotation = 0; rotation < Tetrimino.LENGTH; rotation++) {   
-            const heuristic = computeMoveHeuristic(col, rotation);
+        for (let rotation = 0; rotation < Tetrimino.LENGTH; rotation++) {     
+            const heuristic = computeMoveHeuristic(col);  
             
-            if (heuristic !== null && heuristic > maxVal) {
-                maxVal = heuristic;
+            currTetrimino.nextRotation();
+            
+            if (heuristic !== null && heuristic > maxHeuristic) {
+                maxHeuristic = heuristic;
                 maxCol = col;
                 maxRotation = rotation
-            }
-
-            // TEMPORARY HACK: REMOVE LATER
-            for (let i = 0; i < rotation; i++) {
-                currTetrimino.prevRotation();
             }
         }
     }
@@ -122,49 +120,65 @@ export function computeOptimalMove(): [number, number] {
     return [maxCol, maxRotation];
 }
 
-// NEEDS FIXED
-function computeMoveHeuristic(col: number, rotation: number): number| null {
-    // need deep copy
-    const testTetrimino = currTetrimino;
+function configureNewTetrimino() {
+    currRow = 0;
+    currCol = WIDTH / 2;
+    currTetrimino = nextTetrimino;
+    nextTetrimino = new Tetrimino();
+}
+
+function runAI () {
+    const [optimalCol, optimalRotations] = computeOptimalMove();
+
+    currCol = optimalCol
+
+    for (let i = 0; i < optimalRotations; i++) {
+        currTetrimino.nextRotation();
+    } 
+}
+
+
+function computeMoveHeuristic(col: number): number | null {
     let row = 0; 
 
-    for (let i = 0; i < rotation; i++) {
-        testTetrimino.nextRotation();     
-    }
-
-    if (!noCollisions(testTetrimino, row, col)) {
+    if (!noCollisions(currTetrimino, row, col)) {
         return null;
     }
 
-    while (canMoveDown(testTetrimino, row, col)) {              
+    while (canMoveTetriminoDown(currTetrimino, row, col)) {              
         row++;
     }
 
-    return computeHeuristic(testTetrimino, row, col);
+    return computeHeuristic(currTetrimino, row, col);
 }
 
-// NEEDS FIXED
-function computeHeuristic(tetrimino: Tetrimino, relativeRow: number, relativeCol: number) {
+function computeHeuristic(tetrimino: Tetrimino, rowPos: number, colPos: number) {
     let rating = 0;
 
     for (let row = 1; row < HEIGHT; row++) {
         for (let col = 0; col < WIDTH; col++) {
-            if (!isFilledAt(row, col) && !tetriminoHasCoord(tetrimino, row, col, relativeRow, relativeCol) 
-            && (isFilledAt(row - 1, col) || tetriminoHasCoord(tetrimino, row - 1, col, relativeRow, relativeCol))) {
+            if (coordHasEmptyHole(tetrimino, row, col, rowPos, colPos)) {
                 rating -= 10;
             }
         }
     }
 
-    return rating - (HEIGHT - relativeRow);
+    return rating - (HEIGHT - rowPos);
 }
 
-// NEEDS FIXED
-function tetriminoHasCoord(tetrimino: Tetrimino, targetRow: number, targetCol: number, relativeRow: number, relativeCol: number) {
-    return tetrimino.tiles().reduce((hasCoord, [row, col]) => hasCoord || row + relativeRow === targetRow && col + relativeCol === targetCol, false);
+// Return true if position has an empty space with a filled piece on top of it
+function coordHasEmptyHole(tetrimino: Tetrimino, row: number, col: number, rowPos: number, colPos: number) {
+    const isFilledAbove = !isFilledAt(row, col) && !tetriminoHasCoord(tetrimino, row, col, rowPos, colPos) 
+    const isEmptyBelow = isFilledAt(row - 1, col) || tetriminoHasCoord(tetrimino, row - 1, col, rowPos, colPos);
+
+    return isFilledAbove && isEmptyBelow;
 }
 
-function canHoldTetrimino() {
+function tetriminoHasCoord(tetrimino: Tetrimino, targRow: number, targCol: number, rowPos: number, colPos: number) {
+    return tetrimino.tiles().some(([row, col]) => row + rowPos === targRow && col + colPos === targCol);
+}
+
+function canHold() {
     if (holdingTetrimino === undefined) {
         return noCollisions(nextTetrimino, currRow, currCol);
     } else {
@@ -172,7 +186,7 @@ function canHoldTetrimino() {
     }
 }
 
-function swapWithHoldingTetrimino() {
+function swapWithHold() {
     if (holdingTetrimino === undefined) {
         holdingTetrimino = currTetrimino;
         currTetrimino = nextTetrimino;
@@ -185,7 +199,7 @@ function swapWithHoldingTetrimino() {
     }
 }
 
-function renderHoldBlock() {
+function renderHoldPreview() {
     notifyController(GameMessages.ClearHoldBlock, null);
 
     holdingTetrimino.tiles().forEach(([row, col]) => {
@@ -194,12 +208,12 @@ function renderHoldBlock() {
 }
 
 function noCollisions(tetrimino: Tetrimino, row: number, col: number) {
-    return canMoveBlock(0, 0, i => tetrimino.rowAt(i) + row >= HEIGHT 
+    return canMoveTetrimino(0, 0, i => tetrimino.rowAt(i) + row >= HEIGHT 
         || tetrimino.colAt(i) + col < 0 || tetrimino.colAt(i) + col >= WIDTH, 
            tetrimino, row, col);
 }
 
-function renderNextBlock() {
+function renderNextPreview() {
    notifyController(GameMessages.ClearNextBlock, null);
 
    nextTetrimino.tiles().forEach(([row, col]) => {
@@ -207,22 +221,22 @@ function renderNextBlock() {
     });
 }
 
-function moveBlock(rowMove: number, colMove: number, edgeGridCondition: (input: number) => boolean) {
-	if (canMoveBlock(rowMove, colMove, edgeGridCondition, currTetrimino, currRow, currCol)) { 
-        shiftBlock(rowMove, colMove);
+function moveCurrTetrimino(rowMove: number, colMove: number, edgeGridCondition: (input: number) => boolean) {
+	if (canMoveTetrimino(rowMove, colMove, edgeGridCondition, currTetrimino, currRow, currCol)) { 
+        shiftCurrTetrimino(rowMove, colMove);
     }
 }
 
-function shiftBlock(rowMove: number, colMove: number) {
-	renderClearBlock();
+function shiftCurrTetrimino(rowMove: number, colMove: number) {
+	renderClearTetrimino();
 	
     currRow += rowMove;
     currCol += colMove;
 
-	renderBlock();
+	renderTetrimino();
 }
 
-function renderClearBlock() {
+function renderClearTetrimino() {
 	currTetrimino.tiles().forEach(([row, col]) => {
         renderClearTile(row + currRow, col + currCol);
     });
@@ -232,7 +246,7 @@ function renderClearTile(row: number, col: number) {
     notifyController(GameMessages.ClearGridTile, [row, col]);
 }
 
-function renderBlock() {
+function renderTetrimino() {
 	currTetrimino.tiles().forEach(([row, col]) => {
         renderTile(row + currRow, col + currCol);
     });
@@ -242,7 +256,7 @@ function renderTile(row: number, col: number) {
     notifyController(GameMessages.FillGridTile, [row, col]);
 }
 
-function updateGridWithBlock() {
+function updateGridWithTetrimino() {
     currTetrimino.tiles().forEach(([row, col]) => {
         fillAt(row + currRow, col + currCol);
     });
@@ -277,10 +291,10 @@ function clearLine(row: number) {
 }
 
 // NEEDS FIXED
-function canMoveBlock(rowMove: number, colMove: number, 
-                      edgeGridCondition: (input: number) => boolean, 
-                      tetrimino: Tetrimino, 
-                      row: number, col: number) {
+function canMoveTetrimino(rowMove: number, colMove: number, 
+                          edgeGridCondition: (input: number) => boolean, 
+                          tetrimino: Tetrimino, 
+                          row: number, col: number) {
 
 	for (let i = 0; i < Tetrimino.LENGTH; i++) {
 		if (edgeGridCondition(i)) {
@@ -295,6 +309,6 @@ function canMoveBlock(rowMove: number, colMove: number,
 	return true;
 }
 
-function canMoveDown(tetrimino: Tetrimino, row: number, col: number) { 
-	return canMoveBlock(1, 0, (i: number) => tetrimino.rowAt(i) + row  >= HEIGHT - 1, tetrimino, row, col);
+function canMoveTetriminoDown(tetrimino: Tetrimino, row: number, col: number) { 
+	return canMoveTetrimino(1, 0, (i: number) => tetrimino.rowAt(i) + row  >= HEIGHT - 1, tetrimino, row, col);
 }

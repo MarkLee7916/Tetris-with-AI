@@ -1,50 +1,43 @@
-import { fallingBlock, initGame, isGameOver, GameMessages, moveLeft, rotatePiece as rotateTetrimino, moveRight, moveDown, holdTetrimino} from "../models/game";
-import { initEmptyGrid } from "../models/grid";
-import { clearHoldBlockDOM, clearNextBlockDOM, eraseGridTileDOM, fillHoldBlockTileDOM, initView, fillGridTileDOM, replaceGridRowDOM, ViewMessages, fillNextBlockTileDOM } from "../views/view";
+import { fall, initGame, isGameOver, GameMessages, moveCurrTetriminoLeft, moveCurrTetriminoRight, moveCurrTetriminoDown, hold, toggleAI, rotateCurrTetrimino} from "../models/game";
+import { clearHoldBlockDOM, clearNextBlockDOM, eraseGridTileDOM, fillHoldBlockTileDOM, initView, fillGridTileDOM, replaceGridRowDOM, ViewMessages, fillNextBlockTileDOM, gameOverMessage } from "../views/view";
 
 export const HEIGHT = 20;
 export const WIDTH = 20;
 
-interface State {
-    running: boolean
-}
+let running = true;
 
-const state: State = {
-    running: true
-}
-
-runGame();
-
-async function runGame() {
+(async function runGame() {
     initView(readMessageFromView);
     initGame(readMessageFromGame);
-    initEmptyGrid();
 
-	while (state.running) {
-        await fallingBlock();
+	while (running) {
+        await fall();
 
         if (isGameOver()) {
             gameOver();
         }
     }	
-}
+})();
 
 function readMessageFromView(message: ViewMessages, content: any) {
     switch (message) {
         case ViewMessages.MoveDown:
-            moveDown();
+            moveCurrTetriminoDown();
             break;
         case ViewMessages.MoveLeft:
-            moveLeft();
+            moveCurrTetriminoLeft();
             break;
         case ViewMessages.MoveRight:
-            moveRight();
+            moveCurrTetriminoRight();
             break;
         case ViewMessages.Rotate:
-            rotateTetrimino();
+            rotateCurrTetrimino();
             break;
         case ViewMessages.Hold:
-            holdTetrimino();
+            hold();
+            break;
+        case ViewMessages.ToggleAI:
+            toggleAI();
             break;
         default:
             throw `Argument not supported: ${message}`;
@@ -110,5 +103,6 @@ function eraseCoordFromView(content: any) {
 }
 
 function gameOver() {
-	state.running = false;
+    running = false;
+    gameOverMessage();
 }
