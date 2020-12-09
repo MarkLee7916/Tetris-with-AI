@@ -3,6 +3,7 @@ import { wait } from "../utils";
 import { clearRow, fillAt, initEmptyGrid, isFilledAt } from "./grid";
 import { Tetrimino } from "./tetrimino";
 
+// The protocol we use to talk to the controller
 export const enum GameMessages {
     ReplaceRow,
     FillGridTile,
@@ -14,29 +15,45 @@ export const enum GameMessages {
     ClearGrid
 }
 
-const delayTime = 0;
+// Time we wait every time the current tetrimino moves. The lower this number is, the fast the game will flow
+let delayTime: number;
 
+// Pass a parameterized message to controller
 let notifyController: (message: GameMessages, arg: any) => void;
+
+// Tetrimino that will load after the current one
 let nextTetrimino: Tetrimino;
+
+// Tetrimino that player is holding
 let holdingTetrimino: Tetrimino;
+
+// The current tetrimino on the screen
 let currTetrimino: Tetrimino;
+
+// The relative position of the current tetrimino on the screen
 let currRow: number;
 let currCol: number;
 let isAIRunning: boolean;
 
+// Initialise state needed for game to function
 export function initGame(notif: (message: GameMessages, arg: any) => void) {
-    initEmptyGrid();
-
+    holdingTetrimino = new Tetrimino();
     nextTetrimino = new Tetrimino();
     isAIRunning = true;
+    delayTime = 500;
     notifyController = notif;
+
+    initEmptyGrid();
+    renderHoldPreview();
 }
 
+// If AI is running, stop it running, if AI is not running, run it
 export function toggleAI() {
-    isAIRunning = isAIRunning ? false : true;
+    isAIRunning = !isAIRunning;
 }
 
-export async function fall() {    
+// Simulates the process of a tetrimino being generated, falling and hitting the ground, possibly clearing lines
+export async function runTurn() {    
     configureNewTetrimino();
 
     if (isAIRunning) {
@@ -45,12 +62,9 @@ export async function fall() {
 
     renderNextPreview();
 
-    while (canMoveTetriminoDown(currTetrimino, currRow, currCol)) {        
-        moveCurrTetriminoDown();
-        await wait(delayTime);
-    }
+    await makeCurrTetriminoFall();
 
-    updateGridWithTetrimino();
+    updateGridWithTetrimino(currTetrimino);
 	handleLineClears();
 }
 
@@ -65,49 +79,80 @@ export function isGameOver() {
 }
 
 export function rotateCurrTetrimino() {
-	renderClearTetrimino();
-	currTetrimino.nextRotation();
-
-	if (!noCollisions(currTetrimino, currRow, currCol)) {
-        currTetrimino.prevRotation();
-    }
-
-	renderTetrimino();
+    rotateTetrimino(currTetrimino);
 }
 
 export function moveCurrTetriminoLeft() {
-	moveCurrTetrimino(0, -1, (i: number) => currTetrimino.colAt(i) + currCol <= 0);
+    moveTetriminoLeft(currTetrimino);
 }
 
 export function moveCurrTetriminoRight() {
-	moveCurrTetrimino(0, 1, i => currTetrimino.colAt(i) + currCol >= WIDTH - 1);
+    moveTetriminoRight(currTetrimino);
 }
 
 export function moveCurrTetriminoDown() {
-	moveCurrTetrimino(1, 0, i => currTetrimino.rowAt(i) + currRow  >= HEIGHT - 1);
+    moveTetriminoDown(currTetrimino);
 }
 
+export function updateDelayTime(newDelay: number) {
+    delayTime = newDelay;
+}
+
+// Swap the current tetrimino with the one we're holding, dealing with rendering and failure case
 export function hold() {
     if (canHold()) {
-        renderClearTetrimino();
+        renderClearTetrimino(currTetrimino);
 
         swapWithHold();
 
         renderHoldPreview();
-        renderTetrimino();
+        renderTetrimino(currTetrimino);
     }
 }
 
-export function computeOptimalMove(): [number, number] {
+// Simulate the tetrimino falling
+async function makeCurrTetriminoFall() {
+    while (canMoveTetriminoDown(currTetrimino, currRow, currCol)) {        
+        moveTetriminoDown(currTetrimino);
+        await wait(delayTime);
+    }
+}
+
+// Rotate the tetrimino, handling failure cases
+function rotateTetrimino(tet: Tetrimino) {
+	renderClearTetrimino(tet);
+	tet.nextRotation();
+
+	if (!noCollisions(tet, currRow, currCol)) {
+        tet.prevRotation();
+    }
+
+	renderTetrimino(tet);
+}
+
+function moveTetriminoLeft(tet: Tetrimino) {
+	moveTetrimino(0, -1, (i: number) => tet.colAt(i) + currCol <= 0, tet);
+}
+
+function moveTetriminoRight(tet: Tetrimino) {
+	moveTetrimino(0, 1, i => tet.colAt(i) + currCol >= WIDTH - 1, tet);
+}
+
+function moveTetriminoDown(tet: Tetrimino) {
+	moveTetrimino(1, 0, i => tet.rowAt(i) + currRow  >= HEIGHT - 1, tet);
+}
+
+// Return the column and rotation of the best move we can make with the given tetriminoo
+function computeOptimalMove(tet: Tetrimino): [number, number] {
     let maxRotation = Number.MIN_SAFE_INTEGER
     let maxCol = Number.MIN_SAFE_INTEGER;
     let maxHeuristic = Number.MIN_SAFE_INTEGER;
 
     for (let col = 0; col < WIDTH; col++) {
-        for (let rotation = 0; rotation < Tetrimino.LENGTH; rotation++) {     
-            const heuristic = computeMoveHeuristic(col);  
+        for (let rotation = 0; rotation < Tetrimino.TILE_COUNT; rotation++) {     
+            const heuristic = computeMoveHeuristic(tet, col);  
             
-            currTetrimino.nextRotation();
+            tet.nextRotation();
             
             if (heuristic !== null && heuristic > maxHeuristic) {
                 maxHeuristic = heuristic;
@@ -120,6 +165,7 @@ export function computeOptimalMove(): [number, number] {
     return [maxCol, maxRotation];
 }
 
+// Make current tetrimino the one stored in next and generate a new next, resetting row and column
 function configureNewTetrimino() {
     currRow = 0;
     currCol = WIDTH / 2;
@@ -127,8 +173,9 @@ function configureNewTetrimino() {
     nextTetrimino = new Tetrimino();
 }
 
+// Make the optimal move
 function runAI () {
-    const [optimalCol, optimalRotations] = computeOptimalMove();
+    const [optimalCol, optimalRotations] = computeOptimalMove(currTetrimino);
 
     currCol = optimalCol
 
@@ -137,21 +184,22 @@ function runAI () {
     } 
 }
 
-
-function computeMoveHeuristic(col: number): number | null {
+// Simulate a piece falling and use it to get the heuristic value for a tetrimino position and its rotation
+function computeMoveHeuristic(tet: Tetrimino, col: number): number | null {
     let row = 0; 
 
-    if (!noCollisions(currTetrimino, row, col)) {
+    if (!noCollisions(tet, row, col)) {
         return null;
     }
 
-    while (canMoveTetriminoDown(currTetrimino, row, col)) {              
+    while (canMoveTetriminoDown(tet, row, col)) {              
         row++;
     }
 
-    return computeHeuristic(currTetrimino, row, col);
+    return computeHeuristic(tet, row, col);
 }
 
+// Calculate the heuristic value for a tetrimino position and its rotation
 function computeHeuristic(tetrimino: Tetrimino, rowPos: number, colPos: number) {
     let rating = 0;
 
@@ -167,38 +215,31 @@ function computeHeuristic(tetrimino: Tetrimino, rowPos: number, colPos: number) 
 }
 
 // Return true if position has an empty space with a filled piece on top of it
-function coordHasEmptyHole(tetrimino: Tetrimino, row: number, col: number, rowPos: number, colPos: number) {
-    const isFilledAbove = !isFilledAt(row, col) && !tetriminoHasCoord(tetrimino, row, col, rowPos, colPos) 
-    const isEmptyBelow = isFilledAt(row - 1, col) || tetriminoHasCoord(tetrimino, row - 1, col, rowPos, colPos);
+function coordHasEmptyHole(tet: Tetrimino, row: number, col: number, rowPos: number, colPos: number) {
+    const isFilledAbove = !isFilledAt(row, col) && !tetriminoHasCoord(tet, row, col, rowPos, colPos) 
+    const isEmptyBelow = isFilledAt(row - 1, col) || tetriminoHasCoord(tet, row - 1, col, rowPos, colPos);
 
     return isFilledAbove && isEmptyBelow;
 }
 
+// Return true if a tetriminos coordinates overlap with a given row and column
 function tetriminoHasCoord(tetrimino: Tetrimino, targRow: number, targCol: number, rowPos: number, colPos: number) {
     return tetrimino.tiles().some(([row, col]) => row + rowPos === targRow && col + colPos === targCol);
 }
 
 function canHold() {
-    if (holdingTetrimino === undefined) {
-        return noCollisions(nextTetrimino, currRow, currCol);
-    } else {
-        return noCollisions(holdingTetrimino, currRow, currCol);
-    }
+    return noCollisions(holdingTetrimino, currRow, currCol);
 }
 
+// Swap current tetrimino and holding tetrimino, doesn't deal with rendering or error cases
 function swapWithHold() {
-    if (holdingTetrimino === undefined) {
-        holdingTetrimino = currTetrimino;
-        currTetrimino = nextTetrimino;
-        nextTetrimino = new Tetrimino();
-    } else {
-        const temp = currTetrimino;
+    const temp = currTetrimino;
 
-        currTetrimino = holdingTetrimino;
-        holdingTetrimino = temp;
-    }
+    currTetrimino = holdingTetrimino;
+    holdingTetrimino = temp;
 }
 
+// Tell the controller to update the holding preview with the current holding tetrimino
 function renderHoldPreview() {
     notifyController(GameMessages.ClearHoldBlock, null);
 
@@ -207,12 +248,14 @@ function renderHoldPreview() {
     });
 }
 
+// Return true if the given tetrimino doesn't go out of bounds or overlap with another tetrimino
 function noCollisions(tetrimino: Tetrimino, row: number, col: number) {
     return canMoveTetrimino(0, 0, i => tetrimino.rowAt(i) + row >= HEIGHT 
         || tetrimino.colAt(i) + col < 0 || tetrimino.colAt(i) + col >= WIDTH, 
            tetrimino, row, col);
 }
 
+// Tell the controller to update the next preview with the next tetrimino
 function renderNextPreview() {
    notifyController(GameMessages.ClearNextBlock, null);
 
@@ -221,51 +264,59 @@ function renderNextPreview() {
     });
 }
 
-function moveCurrTetrimino(rowMove: number, colMove: number, edgeGridCondition: (input: number) => boolean) {
-	if (canMoveTetrimino(rowMove, colMove, edgeGridCondition, currTetrimino, currRow, currCol)) { 
-        shiftCurrTetrimino(rowMove, colMove);
+// Move tetrimino, handling error case
+function moveTetrimino(rowMove: number, colMove: number, edgeGridCondition: (input: number) => boolean, tet: Tetrimino) {
+	if (canMoveTetrimino(rowMove, colMove, edgeGridCondition, tet, currRow, currCol)) { 
+        shiftTetrimino(rowMove, colMove, tet);
     }
 }
 
-function shiftCurrTetrimino(rowMove: number, colMove: number) {
-	renderClearTetrimino();
+// Move tetrimono, doesn't deal with error case
+function shiftTetrimino(rowMove: number, colMove: number, tet: Tetrimino) {
+	renderClearTetrimino(tet);
 	
     currRow += rowMove;
     currCol += colMove;
 
-	renderTetrimino();
+	renderTetrimino(tet);
 }
 
-function renderClearTetrimino() {
-	currTetrimino.tiles().forEach(([row, col]) => {
+// Tell the controller to clear a tetrimino from the grid
+function renderClearTetrimino(tetrimino: Tetrimino) {
+	tetrimino.tiles().forEach(([row, col]) => {
         renderClearTile(row + currRow, col + currCol);
     });
 }
 
+// Tell the controller to clear a tile from the grid
 function renderClearTile(row: number, col: number) {
     notifyController(GameMessages.ClearGridTile, [row, col]);
 }
 
-function renderTetrimino() {
-	currTetrimino.tiles().forEach(([row, col]) => {
+// Tell the controller to render a tetrimino in the grid
+function renderTetrimino(tetrimino: Tetrimino) {
+	tetrimino.tiles().forEach(([row, col]) => {
         renderTile(row + currRow, col + currCol);
     });
 }
 
+// Tell the controller to render a tile in the grid
 function renderTile(row: number, col: number) {
     notifyController(GameMessages.FillGridTile, [row, col]);
 }
 
-function updateGridWithTetrimino() {
-    currTetrimino.tiles().forEach(([row, col]) => {
+// Update the grid backend with a tetriminos position
+function updateGridWithTetrimino(tetrimino: Tetrimino) {
+    tetrimino.tiles().forEach(([row, col]) => {
         fillAt(row + currRow, col + currCol);
     });
 }
-
+// Tell the controller to clear a row 
 function renderClearRow(row: number) {
     notifyController(GameMessages.ReplaceRow, row);
 }
 
+// Detect if we've got a line clear, if we have clear it
 function handleLineClears() {
 	for (let row = 0; row < HEIGHT; row++) {
 		if (isFilledLine(row)) {
@@ -274,6 +325,7 @@ function handleLineClears() {
     }
 }
 
+// Detect if we've got a line clear
 function isFilledLine(row: number) {
 	for (let col = 0; col < WIDTH; col++) {
 		if (!isFilledAt(row, col)) {
@@ -290,13 +342,12 @@ function clearLine(row: number) {
     renderClearRow(row);
 }
 
-// NEEDS FIXED
 function canMoveTetrimino(rowMove: number, colMove: number, 
                           edgeGridCondition: (input: number) => boolean, 
                           tetrimino: Tetrimino, 
                           row: number, col: number) {
 
-	for (let i = 0; i < Tetrimino.LENGTH; i++) {
+	for (let i = 0; i < Tetrimino.TILE_COUNT; i++) {
 		if (edgeGridCondition(i)) {
             return false;
         }
@@ -312,3 +363,7 @@ function canMoveTetrimino(rowMove: number, colMove: number,
 function canMoveTetriminoDown(tetrimino: Tetrimino, row: number, col: number) { 
 	return canMoveTetrimino(1, 0, (i: number) => tetrimino.rowAt(i) + row  >= HEIGHT - 1, tetrimino, row, col);
 }
+
+
+
+

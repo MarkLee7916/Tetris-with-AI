@@ -11,10 +11,27 @@
             <header>
                 <nav>
                     <ul id="menu">
-                        <button class="menu-button" id="reset">Reset</button>
-                        <button class="menu-button" id="hold">Hold Block</button>
-                        <button class="menu-button" id="toggle-ai">Toggle AI</button>
-                        <span class="menu-text" id="line-clears">Line Clears: 0</span>
+                        <span class="menu-segment">
+                            <button class="menu-button" id="reset">Reset</button>
+                        </span>
+
+                        <span class="menu-segment">
+                            <button class="menu-button" id="hold">Hold Block</button>
+                        </span>
+
+                        <span class="menu-segment">
+                            <button class="menu-button" id="toggle-ai">Toggle AI</button>
+                        </span>
+
+                        <span class="menu-segment">
+                            <span class="menu-text" id="line-clears">Line Clears: 0</span>
+                        </span>
+
+                        <span class="menu-segment">
+                            <label for="speed-toggle" class="menu-text">Toggle Speed</label>
+                            <input type="range" min="0" max="1000" value="500" id="speed-toggle">
+                        </span>
+                        
                     </ul>
                 </nav>
             </header>

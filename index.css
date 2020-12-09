@@ -33,14 +33,16 @@ header::after {
   color: white;
   cursor: pointer;
   outline: none;
-  padding-right: 100px;
 }
 
 .menu-text {
-  padding-left: 10px;
-  padding-right: 10px;
   font-size: 16px;
   color: white;
+}
+
+.menu-segment {
+  padding-left: 50px;
+  padding-right: 50px;
 }
 
 #grid {
@@ -55,4 +57,12 @@ header::after {
 
 #game {
   display: flex;
+}
+
+label {
+  padding-right: 10px;
+}
+
+#speed-toggle {
+  direction: rtl;
 }

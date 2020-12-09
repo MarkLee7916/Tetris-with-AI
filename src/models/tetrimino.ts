@@ -2,10 +2,17 @@ import { randomIntBetween, randomItemFromArray } from "../utils";
 import { blockTypes } from "./blockTypes";
 
 export class Tetrimino {
+    // Represents shape of tetrimino
     private readonly dimensions: number[][][];
-    private static readonly ROTATION_TYPES = 4;
+
+    // Which rotation we're on
     private rotationIndex: number;
-    public static readonly LENGTH = 4;
+
+    // The number of possible rotations a tetrimino could be in
+    private static readonly ROTATION_TYPES = 4;
+
+    // The number of tiles in a tetrimino
+    public static readonly TILE_COUNT = 4;
     
     constructor() {
         this.dimensions = randomItemFromArray(blockTypes);
@@ -26,6 +33,7 @@ export class Tetrimino {
 			this.rotationIndex--;
     }
 
+    // Return list of coordinates in tetrimino, where a coordinate is a row col pair 
     public tiles(): number[][] {
         return this.dimensions[this.rotationIndex];
     }

@@ -1,16 +1,17 @@
 import { HEIGHT, WIDTH } from "../controllers/controller";
 
-
+// The protocol we use to talk to the controller
 export const enum ViewMessages {
     MoveLeft,
     MoveRight,
     MoveDown,
     Rotate,
     Hold,
-    ToggleAI
+    ToggleAI,
+    ChangeSpeed
 }
 
-const WALL_COLOR = "white";
+const GRID_BACKGROUND_COLOR = "white";
 const PLACEHOLDER = "pink";
 const ACTIVE_BUTTON_COLOR = "#7FDBFF";
 const DEFAULT_BUTTON_COLOR = "white";
@@ -21,24 +22,27 @@ let lineClears = 0;
 
 export function initView(notif: (message: ViewMessages, content: any) => void) {
     initGridInDOM();
-    initHoldBlockDisplayDOM();
-    initNextBlockDisplayDOM();
+    initHoldPreviewDisplayDOM();
+    initNextPreviewDisplayDOM();
     initStyles();
     initEventListeners();
 
     notifyController = notif;
 }
 
+// Reset a grid tile to the default colour (the background color)
 export function eraseGridTileDOM([row, col]: [number, number]) {
     const tileDOM = getTileInDOM(row, col, "#grid");
 
-    tileDOM.style.backgroundColor = WALL_COLOR;
+    tileDOM.style.backgroundColor = GRID_BACKGROUND_COLOR;
 }
 
+// Set a grid tile to some tetrimino color
 export function fillGridTileDOM([row, col]: [number, number]) {
-    fillTileDOM(row, col, "#grid");
+    fillTileGenericDOM(row, col, "#grid");
 }
 
+// Get rid of the row and place an empty one on top, simulating a line clear
 export function replaceGridRowDOM(row: number) {
     const gridDOM = <HTMLTableElement> getDOMElem("#grid");
 
@@ -47,20 +51,20 @@ export function replaceGridRowDOM(row: number) {
     updateLineClearCounter();
 }
 
-export function clearNextBlockDOM() {
-    clearBlockDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
+export function clearNextPreviewDOM() {
+    clearGridGenericDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
 }
 
-export function clearHoldBlockDOM() {
-    clearBlockDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
+export function clearHoldPreviewDOM() {
+    clearGridGenericDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
 }
 
-export function fillNextBlockTileDOM([row, col]: [number, number]) {
-    fillTileDOM(row, col, "#next-block");
+export function fillNextPreviewTileDOM([row, col]: [number, number]) {
+    fillTileGenericDOM(row, col, "#next-block");
 }
 
-export function fillHoldBlockTileDOM([row, col]: [number, number]) {
-    fillTileDOM(row, col, "#hold-block");
+export function fillHoldPreviewTileDOM([row, col]: [number, number]) {
+    fillTileGenericDOM(row, col, "#hold-block");
 }
 
 export function gameOverMessage() {
@@ -73,33 +77,36 @@ function updateLineClearCounter() {
     lineClearCounter.innerHTML = `Line Clears: ${++lineClears}`
 }
 
-function clearBlockDOM(height: number, width: number, selector: string) {
+// Clears some grid, for example the main grid, the next preview or holding preview
+function clearGridGenericDOM(height: number, width: number, selector: string) {
     for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
             const tile = getTileInDOM(row, col, selector);
 
-            tile.style.backgroundColor = WALL_COLOR;
+            tile.style.backgroundColor = GRID_BACKGROUND_COLOR;
         }
     }
 }
 
+// Initialse default styling for some components
 function initStyles() {
     const toggleAIButtonDOM = <HTMLButtonElement> getDOMElem("#toggle-ai");
 
     toggleAIButtonDOM.style.color = ACTIVE_BUTTON_COLOR;
 }
 
-function fillTileDOM(row: number, col: number, selector: string) {
+// Fills some tile in some grid, for example the main grid, the next preview or holding preview
+function fillTileGenericDOM(row: number, col: number, selector: string) {
     const elemDOM = getTileInDOM(row, col, selector)
 
     elemDOM.style.backgroundColor = PLACEHOLDER;
 }
 
-function initHoldBlockDisplayDOM() {
+function initHoldPreviewDisplayDOM() {
     initGenericTable(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
 }
 
-function initNextBlockDisplayDOM() {
+function initNextPreviewDisplayDOM() {
     initGenericTable(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
 }
 
@@ -108,6 +115,7 @@ function initGridInDOM() {
     initGenericTable(HEIGHT, WIDTH, "#grid");
 }
 
+// Generic function that takes in a selector for a table and fills it with empty table cells
 function initGenericTable(height: number, width: number, selector: string) {
     const elemDOM = getDOMElem(selector);
 
@@ -121,7 +129,15 @@ function initEventListeners() {
 
     getDOMElem("#hold").addEventListener("click", () => notifyController(ViewMessages.Hold, null));
     getDOMElem("#reset").addEventListener("click", () => location.reload());
-    getDOMElem("#toggle-ai").addEventListener("click", toggleAI)
+    getDOMElem("#toggle-ai").addEventListener("click", toggleAI);
+    getDOMElem("#speed-toggle").addEventListener("change", updateSpeed);
+}
+
+function updateSpeed(event: Event) {
+    const speedSlider = <HTMLButtonElement> event.target;
+    const newVal = speedSlider.value;
+
+    notifyController(ViewMessages.ChangeSpeed, parseInt(newVal));
 }
 
 function toggleAI(event: Event) {
@@ -182,7 +198,7 @@ function createEmptyTileInDOM() {
 	const newTile = document.createElement("td");
 
 	newTile.className = "tile";
-	newTile.style.backgroundColor = WALL_COLOR;
+	newTile.style.backgroundColor = GRID_BACKGROUND_COLOR;
 
 	return newTile;
 }

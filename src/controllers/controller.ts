@@ -1,17 +1,18 @@
-import { fall, initGame, isGameOver, GameMessages, moveCurrTetriminoLeft, moveCurrTetriminoRight, moveCurrTetriminoDown, hold, toggleAI, rotateCurrTetrimino} from "../models/game";
-import { clearHoldBlockDOM, clearNextBlockDOM, eraseGridTileDOM, fillHoldBlockTileDOM, initView, fillGridTileDOM, replaceGridRowDOM, ViewMessages, fillNextBlockTileDOM, gameOverMessage } from "../views/view";
+import {initGame, isGameOver, GameMessages, toggleAI, moveCurrTetriminoLeft, updateDelayTime, moveCurrTetriminoRight, hold, rotateCurrTetrimino, moveCurrTetriminoDown, runTurn} from "../models/game";
+import { clearHoldPreviewDOM, clearNextPreviewDOM, eraseGridTileDOM, fillHoldPreviewTileDOM, initView, fillGridTileDOM, replaceGridRowDOM, ViewMessages, fillNextPreviewTileDOM, gameOverMessage } from "../views/view";
 
 export const HEIGHT = 20;
 export const WIDTH = 20;
 
 let running = true;
 
+// Main driver function for program
 (async function runGame() {
     initView(readMessageFromView);
-    initGame(readMessageFromGame);
+    initGame((readMessageFromGame));
 
 	while (running) {
-        await fall();
+        await runTurn();
 
         if (isGameOver()) {
             gameOver();
@@ -19,6 +20,7 @@ let running = true;
     }	
 })();
 
+// Callback that executes whenever the view wants to talk to the controller
 function readMessageFromView(message: ViewMessages, content: any) {
     switch (message) {
         case ViewMessages.MoveDown:
@@ -39,11 +41,15 @@ function readMessageFromView(message: ViewMessages, content: any) {
         case ViewMessages.ToggleAI:
             toggleAI();
             break;
+        case ViewMessages.ChangeSpeed:
+            updateDelayTimeInGame(content);
+            break;
         default:
             throw `Argument not supported: ${message}`;
     }
 }
 
+// Callback that executes whenever the game wants to talk to the controller
 function readMessageFromGame(message: GameMessages, content: any) {
     switch (message) {
         case GameMessages.ClearGridTile:
@@ -56,13 +62,13 @@ function readMessageFromGame(message: GameMessages, content: any) {
             replaceRowInView(content);
             break;
         case GameMessages.ClearNextBlock:
-            clearNextBlockDOM();
+            clearNextPreviewDOM();
             break;
         case GameMessages.FillNextBlockTile:
             fillNextBlockTileInView(content);
             break;
         case GameMessages.ClearHoldBlock:
-            clearHoldBlockDOM();
+            clearHoldPreviewDOM();
             break;
         case GameMessages.FillHoldTile:
             fillHoldBlockTileInView(content);
@@ -72,16 +78,22 @@ function readMessageFromGame(message: GameMessages, content: any) {
     }
 }
 
+function updateDelayTimeInGame(content: any) {
+    const newTime = <number> content;
+
+    updateDelayTime(newTime);
+}
+
 function fillNextBlockTileInView(content: any) {
     const tile = <[number, number]> content;
 
-    fillNextBlockTileDOM(tile);
+    fillNextPreviewTileDOM(tile);
 }
 
 function fillHoldBlockTileInView(content: any) {
     const tile = <[number, number]> content;
 
-    fillHoldBlockTileDOM(tile);
+    fillHoldPreviewTileDOM(tile);
 }
 
 function replaceRowInView(content: any) {

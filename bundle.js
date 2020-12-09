@@ -43,17 +43,18 @@ var view_1 = require("../views/view");
 exports.HEIGHT = 20;
 exports.WIDTH = 20;
 var running = true;
+// Main driver function for program
 (function runGame() {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     view_1.initView(readMessageFromView);
-                    game_1.initGame(readMessageFromGame);
+                    game_1.initGame((readMessageFromGame));
                     _a.label = 1;
                 case 1:
                     if (!running) return [3 /*break*/, 3];
-                    return [4 /*yield*/, game_1.fall()];
+                    return [4 /*yield*/, game_1.runTurn()];
                 case 2:
                     _a.sent();
                     if (game_1.isGameOver()) {
@@ -65,6 +66,7 @@ var running = true;
         });
     });
 })();
+// Callback that executes whenever the view wants to talk to the controller
 function readMessageFromView(message, content) {
     switch (message) {
         case 2 /* MoveDown */:
@@ -85,10 +87,14 @@ function readMessageFromView(message, content) {
         case 5 /* ToggleAI */:
             game_1.toggleAI();
             break;
+        case 6 /* ChangeSpeed */:
+            updateDelayTimeInGame(content);
+            break;
         default:
             throw "Argument not supported: " + message;
     }
 }
+// Callback that executes whenever the game wants to talk to the controller
 function readMessageFromGame(message, content) {
     switch (message) {
         case 6 /* ClearGridTile */:
@@ -101,13 +107,13 @@ function readMessageFromGame(message, content) {
             replaceRowInView(content);
             break;
         case 4 /* ClearNextBlock */:
-            view_1.clearNextBlockDOM();
+            view_1.clearNextPreviewDOM();
             break;
         case 2 /* FillNextBlockTile */:
             fillNextBlockTileInView(content);
             break;
         case 5 /* ClearHoldBlock */:
-            view_1.clearHoldBlockDOM();
+            view_1.clearHoldPreviewDOM();
             break;
         case 3 /* FillHoldTile */:
             fillHoldBlockTileInView(content);
@@ -116,13 +122,17 @@ function readMessageFromGame(message, content) {
             throw "Argument not supported: " + message;
     }
 }
+function updateDelayTimeInGame(content) {
+    var newTime = content;
+    game_1.updateDelayTime(newTime);
+}
 function fillNextBlockTileInView(content) {
     var tile = content;
-    view_1.fillNextBlockTileDOM(tile);
+    view_1.fillNextPreviewTileDOM(tile);
 }
 function fillHoldBlockTileInView(content) {
     var tile = content;
-    view_1.fillHoldBlockTileDOM(tile);
+    view_1.fillHoldPreviewTileDOM(tile);
 }
 function replaceRowInView(content) {
     var row = content;
@@ -206,31 +216,43 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 exports.__esModule = true;
-exports.computeOptimalMove = exports.hold = exports.moveCurrTetriminoDown = exports.moveCurrTetriminoRight = exports.moveCurrTetriminoLeft = exports.rotateCurrTetrimino = exports.isGameOver = exports.fall = exports.toggleAI = exports.initGame = void 0;
+exports.hold = exports.updateDelayTime = exports.moveCurrTetriminoDown = exports.moveCurrTetriminoRight = exports.moveCurrTetriminoLeft = exports.rotateCurrTetrimino = exports.isGameOver = exports.runTurn = exports.toggleAI = exports.initGame = void 0;
 var controller_1 = require("../controllers/controller");
 var utils_1 = require("../utils");
 var grid_1 = require("./grid");
 var tetrimino_1 = require("./tetrimino");
-var delayTime = 0;
+// Time we wait every time the current tetrimino moves. The lower this number is, the fast the game will flow
+var delayTime;
+// Pass a parameterized message to controller
 var notifyController;
+// Tetrimino that will load after the current one
 var nextTetrimino;
+// Tetrimino that player is holding
 var holdingTetrimino;
+// The current tetrimino on the screen
 var currTetrimino;
+// The relative position of the current tetrimino on the screen
 var currRow;
 var currCol;
 var isAIRunning;
+// Initialise state needed for game to function
 function initGame(notif) {
-    grid_1.initEmptyGrid();
+    holdingTetrimino = new tetrimino_1.Tetrimino();
     nextTetrimino = new tetrimino_1.Tetrimino();
     isAIRunning = true;
+    delayTime = 500;
     notifyController = notif;
+    grid_1.initEmptyGrid();
+    renderHoldPreview();
 }
 exports.initGame = initGame;
+// If AI is running, stop it running, if AI is not running, run it
 function toggleAI() {
-    isAIRunning = isAIRunning ? false : true;
+    isAIRunning = !isAIRunning;
 }
 exports.toggleAI = toggleAI;
-function fall() {
+// Simulates the process of a tetrimino being generated, falling and hitting the ground, possibly clearing lines
+function runTurn() {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
@@ -240,23 +262,17 @@ function fall() {
                         runAI();
                     }
                     renderNextPreview();
-                    _a.label = 1;
+                    return [4 /*yield*/, makeCurrTetriminoFall()];
                 case 1:
-                    if (!canMoveTetriminoDown(currTetrimino, currRow, currCol)) return [3 /*break*/, 3];
-                    moveCurrTetriminoDown();
-                    return [4 /*yield*/, utils_1.wait(delayTime)];
-                case 2:
                     _a.sent();
-                    return [3 /*break*/, 1];
-                case 3:
-                    updateGridWithTetrimino();
+                    updateGridWithTetrimino(currTetrimino);
                     handleLineClears();
                     return [2 /*return*/];
             }
         });
     });
 }
-exports.fall = fall;
+exports.runTurn = runTurn;
 function isGameOver() {
     for (var col = 0; col < controller_1.WIDTH; col++) {
         if (grid_1.isFilledAt(0, col)) {
@@ -267,43 +283,79 @@ function isGameOver() {
 }
 exports.isGameOver = isGameOver;
 function rotateCurrTetrimino() {
-    renderClearTetrimino();
-    currTetrimino.nextRotation();
-    if (!noCollisions(currTetrimino, currRow, currCol)) {
-        currTetrimino.prevRotation();
-    }
-    renderTetrimino();
+    rotateTetrimino(currTetrimino);
 }
 exports.rotateCurrTetrimino = rotateCurrTetrimino;
 function moveCurrTetriminoLeft() {
-    moveCurrTetrimino(0, -1, function (i) { return currTetrimino.colAt(i) + currCol <= 0; });
+    moveTetriminoLeft(currTetrimino);
 }
 exports.moveCurrTetriminoLeft = moveCurrTetriminoLeft;
 function moveCurrTetriminoRight() {
-    moveCurrTetrimino(0, 1, function (i) { return currTetrimino.colAt(i) + currCol >= controller_1.WIDTH - 1; });
+    moveTetriminoRight(currTetrimino);
 }
 exports.moveCurrTetriminoRight = moveCurrTetriminoRight;
 function moveCurrTetriminoDown() {
-    moveCurrTetrimino(1, 0, function (i) { return currTetrimino.rowAt(i) + currRow >= controller_1.HEIGHT - 1; });
+    moveTetriminoDown(currTetrimino);
 }
 exports.moveCurrTetriminoDown = moveCurrTetriminoDown;
+function updateDelayTime(newDelay) {
+    delayTime = newDelay;
+}
+exports.updateDelayTime = updateDelayTime;
+// Swap the current tetrimino with the one we're holding, dealing with rendering and failure case
 function hold() {
     if (canHold()) {
-        renderClearTetrimino();
+        renderClearTetrimino(currTetrimino);
         swapWithHold();
         renderHoldPreview();
-        renderTetrimino();
+        renderTetrimino(currTetrimino);
     }
 }
 exports.hold = hold;
-function computeOptimalMove() {
+// Simulate the tetrimino falling
+function makeCurrTetriminoFall() {
+    return __awaiter(this, void 0, void 0, function () {
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    if (!canMoveTetriminoDown(currTetrimino, currRow, currCol)) return [3 /*break*/, 2];
+                    moveTetriminoDown(currTetrimino);
+                    return [4 /*yield*/, utils_1.wait(delayTime)];
+                case 1:
+                    _a.sent();
+                    return [3 /*break*/, 0];
+                case 2: return [2 /*return*/];
+            }
+        });
+    });
+}
+// Rotate the tetrimino, handling failure cases
+function rotateTetrimino(tet) {
+    renderClearTetrimino(tet);
+    tet.nextRotation();
+    if (!noCollisions(tet, currRow, currCol)) {
+        tet.prevRotation();
+    }
+    renderTetrimino(tet);
+}
+function moveTetriminoLeft(tet) {
+    moveTetrimino(0, -1, function (i) { return tet.colAt(i) + currCol <= 0; }, tet);
+}
+function moveTetriminoRight(tet) {
+    moveTetrimino(0, 1, function (i) { return tet.colAt(i) + currCol >= controller_1.WIDTH - 1; }, tet);
+}
+function moveTetriminoDown(tet) {
+    moveTetrimino(1, 0, function (i) { return tet.rowAt(i) + currRow >= controller_1.HEIGHT - 1; }, tet);
+}
+// Return the column and rotation of the best move we can make with the given tetriminoo
+function computeOptimalMove(tet) {
     var maxRotation = Number.MIN_SAFE_INTEGER;
     var maxCol = Number.MIN_SAFE_INTEGER;
     var maxHeuristic = Number.MIN_SAFE_INTEGER;
     for (var col = 0; col < controller_1.WIDTH; col++) {
-        for (var rotation = 0; rotation < tetrimino_1.Tetrimino.LENGTH; rotation++) {
-            var heuristic = computeMoveHeuristic(col);
-            currTetrimino.nextRotation();
+        for (var rotation = 0; rotation < tetrimino_1.Tetrimino.TILE_COUNT; rotation++) {
+            var heuristic = computeMoveHeuristic(tet, col);
+            tet.nextRotation();
             if (heuristic !== null && heuristic > maxHeuristic) {
                 maxHeuristic = heuristic;
                 maxCol = col;
@@ -313,30 +365,33 @@ function computeOptimalMove() {
     }
     return [maxCol, maxRotation];
 }
-exports.computeOptimalMove = computeOptimalMove;
+// Make current tetrimino the one stored in next and generate a new next, resetting row and column
 function configureNewTetrimino() {
     currRow = 0;
     currCol = controller_1.WIDTH / 2;
     currTetrimino = nextTetrimino;
     nextTetrimino = new tetrimino_1.Tetrimino();
 }
+// Make the optimal move
 function runAI() {
-    var _a = computeOptimalMove(), optimalCol = _a[0], optimalRotations = _a[1];
+    var _a = computeOptimalMove(currTetrimino), optimalCol = _a[0], optimalRotations = _a[1];
     currCol = optimalCol;
     for (var i = 0; i < optimalRotations; i++) {
         currTetrimino.nextRotation();
     }
 }
-function computeMoveHeuristic(col) {
+// Simulate a piece falling and use it to get the heuristic value for a tetrimino position and its rotation
+function computeMoveHeuristic(tet, col) {
     var row = 0;
-    if (!noCollisions(currTetrimino, row, col)) {
+    if (!noCollisions(tet, row, col)) {
         return null;
     }
-    while (canMoveTetriminoDown(currTetrimino, row, col)) {
+    while (canMoveTetriminoDown(tet, row, col)) {
         row++;
     }
-    return computeHeuristic(currTetrimino, row, col);
+    return computeHeuristic(tet, row, col);
 }
+// Calculate the heuristic value for a tetrimino position and its rotation
 function computeHeuristic(tetrimino, rowPos, colPos) {
     var rating = 0;
     for (var row = 1; row < controller_1.HEIGHT; row++) {
@@ -349,11 +404,12 @@ function computeHeuristic(tetrimino, rowPos, colPos) {
     return rating - (controller_1.HEIGHT - rowPos);
 }
 // Return true if position has an empty space with a filled piece on top of it
-function coordHasEmptyHole(tetrimino, row, col, rowPos, colPos) {
-    var isFilledAbove = !grid_1.isFilledAt(row, col) && !tetriminoHasCoord(tetrimino, row, col, rowPos, colPos);
-    var isEmptyBelow = grid_1.isFilledAt(row - 1, col) || tetriminoHasCoord(tetrimino, row - 1, col, rowPos, colPos);
+function coordHasEmptyHole(tet, row, col, rowPos, colPos) {
+    var isFilledAbove = !grid_1.isFilledAt(row, col) && !tetriminoHasCoord(tet, row, col, rowPos, colPos);
+    var isEmptyBelow = grid_1.isFilledAt(row - 1, col) || tetriminoHasCoord(tet, row - 1, col, rowPos, colPos);
     return isFilledAbove && isEmptyBelow;
 }
+// Return true if a tetriminos coordinates overlap with a given row and column
 function tetriminoHasCoord(tetrimino, targRow, targCol, rowPos, colPos) {
     return tetrimino.tiles().some(function (_a) {
         var row = _a[0], col = _a[1];
@@ -361,25 +417,15 @@ function tetriminoHasCoord(tetrimino, targRow, targCol, rowPos, colPos) {
     });
 }
 function canHold() {
-    if (holdingTetrimino === undefined) {
-        return noCollisions(nextTetrimino, currRow, currCol);
-    }
-    else {
-        return noCollisions(holdingTetrimino, currRow, currCol);
-    }
+    return noCollisions(holdingTetrimino, currRow, currCol);
 }
+// Swap current tetrimino and holding tetrimino, doesn't deal with rendering or error cases
 function swapWithHold() {
-    if (holdingTetrimino === undefined) {
-        holdingTetrimino = currTetrimino;
-        currTetrimino = nextTetrimino;
-        nextTetrimino = new tetrimino_1.Tetrimino();
-    }
-    else {
-        var temp = currTetrimino;
-        currTetrimino = holdingTetrimino;
-        holdingTetrimino = temp;
-    }
+    var temp = currTetrimino;
+    currTetrimino = holdingTetrimino;
+    holdingTetrimino = temp;
 }
+// Tell the controller to update the holding preview with the current holding tetrimino
 function renderHoldPreview() {
     notifyController(5 /* ClearHoldBlock */, null);
     holdingTetrimino.tiles().forEach(function (_a) {
@@ -387,10 +433,12 @@ function renderHoldPreview() {
         notifyController(3 /* FillHoldTile */, [row, col]);
     });
 }
+// Return true if the given tetrimino doesn't go out of bounds or overlap with another tetrimino
 function noCollisions(tetrimino, row, col) {
     return canMoveTetrimino(0, 0, function (i) { return tetrimino.rowAt(i) + row >= controller_1.HEIGHT
         || tetrimino.colAt(i) + col < 0 || tetrimino.colAt(i) + col >= controller_1.WIDTH; }, tetrimino, row, col);
 }
+// Tell the controller to update the next preview with the next tetrimino
 function renderNextPreview() {
     notifyController(4 /* ClearNextBlock */, null);
     nextTetrimino.tiles().forEach(function (_a) {
@@ -398,44 +446,53 @@ function renderNextPreview() {
         notifyController(2 /* FillNextBlockTile */, [row, col]);
     });
 }
-function moveCurrTetrimino(rowMove, colMove, edgeGridCondition) {
-    if (canMoveTetrimino(rowMove, colMove, edgeGridCondition, currTetrimino, currRow, currCol)) {
-        shiftCurrTetrimino(rowMove, colMove);
+// Move tetrimino, handling error case
+function moveTetrimino(rowMove, colMove, edgeGridCondition, tet) {
+    if (canMoveTetrimino(rowMove, colMove, edgeGridCondition, tet, currRow, currCol)) {
+        shiftTetrimino(rowMove, colMove, tet);
     }
 }
-function shiftCurrTetrimino(rowMove, colMove) {
-    renderClearTetrimino();
+// Move tetrimono, doesn't deal with error case
+function shiftTetrimino(rowMove, colMove, tet) {
+    renderClearTetrimino(tet);
     currRow += rowMove;
     currCol += colMove;
-    renderTetrimino();
+    renderTetrimino(tet);
 }
-function renderClearTetrimino() {
-    currTetrimino.tiles().forEach(function (_a) {
+// Tell the controller to clear a tetrimino from the grid
+function renderClearTetrimino(tetrimino) {
+    tetrimino.tiles().forEach(function (_a) {
         var row = _a[0], col = _a[1];
         renderClearTile(row + currRow, col + currCol);
     });
 }
+// Tell the controller to clear a tile from the grid
 function renderClearTile(row, col) {
     notifyController(6 /* ClearGridTile */, [row, col]);
 }
-function renderTetrimino() {
-    currTetrimino.tiles().forEach(function (_a) {
+// Tell the controller to render a tetrimino in the grid
+function renderTetrimino(tetrimino) {
+    tetrimino.tiles().forEach(function (_a) {
         var row = _a[0], col = _a[1];
         renderTile(row + currRow, col + currCol);
     });
 }
+// Tell the controller to render a tile in the grid
 function renderTile(row, col) {
     notifyController(1 /* FillGridTile */, [row, col]);
 }
-function updateGridWithTetrimino() {
-    currTetrimino.tiles().forEach(function (_a) {
+// Update the grid backend with a tetriminos position
+function updateGridWithTetrimino(tetrimino) {
+    tetrimino.tiles().forEach(function (_a) {
         var row = _a[0], col = _a[1];
         grid_1.fillAt(row + currRow, col + currCol);
     });
 }
+// Tell the controller to clear a row 
 function renderClearRow(row) {
     notifyController(0 /* ReplaceRow */, row);
 }
+// Detect if we've got a line clear, if we have clear it
 function handleLineClears() {
     for (var row = 0; row < controller_1.HEIGHT; row++) {
         if (isFilledLine(row)) {
@@ -443,6 +500,7 @@ function handleLineClears() {
         }
     }
 }
+// Detect if we've got a line clear
 function isFilledLine(row) {
     for (var col = 0; col < controller_1.WIDTH; col++) {
         if (!grid_1.isFilledAt(row, col)) {
@@ -455,9 +513,8 @@ function clearLine(row) {
     grid_1.clearRow(row);
     renderClearRow(row);
 }
-// NEEDS FIXED
 function canMoveTetrimino(rowMove, colMove, edgeGridCondition, tetrimino, row, col) {
-    for (var i = 0; i < tetrimino_1.Tetrimino.LENGTH; i++) {
+    for (var i = 0; i < tetrimino_1.Tetrimino.TILE_COUNT; i++) {
         if (edgeGridCondition(i)) {
             return false;
         }
@@ -528,6 +585,7 @@ var Tetrimino = /** @class */ (function () {
         else
             this.rotationIndex--;
     };
+    // Return list of coordinates in tetrimino, where a coordinate is a row col pair 
     Tetrimino.prototype.tiles = function () {
         return this.dimensions[this.rotationIndex];
     };
@@ -539,8 +597,10 @@ var Tetrimino = /** @class */ (function () {
         var currentBlock = this.dimensions[this.rotationIndex];
         return currentBlock[index][1];
     };
+    // The number of possible rotations a tetrimino could be in
     Tetrimino.ROTATION_TYPES = 4;
-    Tetrimino.LENGTH = 4;
+    // The number of tiles in a tetrimino
+    Tetrimino.TILE_COUNT = 4;
     return Tetrimino;
 }());
 exports.Tetrimino = Tetrimino;
@@ -548,7 +608,7 @@ exports.Tetrimino = Tetrimino;
 },{"../utils":6,"./blockTypes":2}],6:[function(require,module,exports){
 "use strict";
 exports.__esModule = true;
-exports.sliceLastChar = exports.lastChar = exports.wait = exports.randomItemFromArray = exports.randomIntBetween = void 0;
+exports.wait = exports.randomItemFromArray = exports.randomIntBetween = void 0;
 // Generates a random integer whose value lies between lower and upper
 function randomIntBetween(lower, upper) {
     return Math.floor(seededRandom() * (upper - lower)) + lower;
@@ -564,15 +624,8 @@ function wait(delayTime) {
     });
 }
 exports.wait = wait;
-function lastChar(str) {
-    return str[str.length - 1];
-}
-exports.lastChar = lastChar;
-function sliceLastChar(str) {
-    return str.slice(0, str.length - 1);
-}
-exports.sliceLastChar = sliceLastChar;
 var seed = 6;
+// A deteriministic random number generator, used only in development
 function seededRandom() {
     var x = Math.sin(seed++) * 10000;
     return x - Math.floor(x);
@@ -581,9 +634,9 @@ function seededRandom() {
 },{}],7:[function(require,module,exports){
 "use strict";
 exports.__esModule = true;
-exports.gameOverMessage = exports.fillHoldBlockTileDOM = exports.fillNextBlockTileDOM = exports.clearHoldBlockDOM = exports.clearNextBlockDOM = exports.replaceGridRowDOM = exports.fillGridTileDOM = exports.eraseGridTileDOM = exports.initView = void 0;
+exports.gameOverMessage = exports.fillHoldPreviewTileDOM = exports.fillNextPreviewTileDOM = exports.clearHoldPreviewDOM = exports.clearNextPreviewDOM = exports.replaceGridRowDOM = exports.fillGridTileDOM = exports.eraseGridTileDOM = exports.initView = void 0;
 var controller_1 = require("../controllers/controller");
-var WALL_COLOR = "white";
+var GRID_BACKGROUND_COLOR = "white";
 var PLACEHOLDER = "pink";
 var ACTIVE_BUTTON_COLOR = "#7FDBFF";
 var DEFAULT_BUTTON_COLOR = "white";
@@ -592,24 +645,27 @@ var notifyController;
 var lineClears = 0;
 function initView(notif) {
     initGridInDOM();
-    initHoldBlockDisplayDOM();
-    initNextBlockDisplayDOM();
+    initHoldPreviewDisplayDOM();
+    initNextPreviewDisplayDOM();
     initStyles();
     initEventListeners();
     notifyController = notif;
 }
 exports.initView = initView;
+// Reset a grid tile to the default colour (the background color)
 function eraseGridTileDOM(_a) {
     var row = _a[0], col = _a[1];
     var tileDOM = getTileInDOM(row, col, "#grid");
-    tileDOM.style.backgroundColor = WALL_COLOR;
+    tileDOM.style.backgroundColor = GRID_BACKGROUND_COLOR;
 }
 exports.eraseGridTileDOM = eraseGridTileDOM;
+// Set a grid tile to some tetrimino color
 function fillGridTileDOM(_a) {
     var row = _a[0], col = _a[1];
-    fillTileDOM(row, col, "#grid");
+    fillTileGenericDOM(row, col, "#grid");
 }
 exports.fillGridTileDOM = fillGridTileDOM;
+// Get rid of the row and place an empty one on top, simulating a line clear
 function replaceGridRowDOM(row) {
     var gridDOM = getDOMElem("#grid");
     gridDOM.deleteRow(row);
@@ -617,24 +673,24 @@ function replaceGridRowDOM(row) {
     updateLineClearCounter();
 }
 exports.replaceGridRowDOM = replaceGridRowDOM;
-function clearNextBlockDOM() {
-    clearBlockDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
+function clearNextPreviewDOM() {
+    clearGridGenericDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
 }
-exports.clearNextBlockDOM = clearNextBlockDOM;
-function clearHoldBlockDOM() {
-    clearBlockDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
+exports.clearNextPreviewDOM = clearNextPreviewDOM;
+function clearHoldPreviewDOM() {
+    clearGridGenericDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
 }
-exports.clearHoldBlockDOM = clearHoldBlockDOM;
-function fillNextBlockTileDOM(_a) {
+exports.clearHoldPreviewDOM = clearHoldPreviewDOM;
+function fillNextPreviewTileDOM(_a) {
     var row = _a[0], col = _a[1];
-    fillTileDOM(row, col, "#next-block");
+    fillTileGenericDOM(row, col, "#next-block");
 }
-exports.fillNextBlockTileDOM = fillNextBlockTileDOM;
-function fillHoldBlockTileDOM(_a) {
+exports.fillNextPreviewTileDOM = fillNextPreviewTileDOM;
+function fillHoldPreviewTileDOM(_a) {
     var row = _a[0], col = _a[1];
-    fillTileDOM(row, col, "#hold-block");
+    fillTileGenericDOM(row, col, "#hold-block");
 }
-exports.fillHoldBlockTileDOM = fillHoldBlockTileDOM;
+exports.fillHoldPreviewTileDOM = fillHoldPreviewTileDOM;
 function gameOverMessage() {
     alert("Game over. You got " + lineClears + " line clears");
 }
@@ -643,32 +699,36 @@ function updateLineClearCounter() {
     var lineClearCounter = getDOMElem("#line-clears");
     lineClearCounter.innerHTML = "Line Clears: " + ++lineClears;
 }
-function clearBlockDOM(height, width, selector) {
+// Clears some grid, for example the main grid, the next preview or holding preview
+function clearGridGenericDOM(height, width, selector) {
     for (var row = 0; row < height; row++) {
         for (var col = 0; col < width; col++) {
             var tile = getTileInDOM(row, col, selector);
-            tile.style.backgroundColor = WALL_COLOR;
+            tile.style.backgroundColor = GRID_BACKGROUND_COLOR;
         }
     }
 }
+// Initialse default styling for some components
 function initStyles() {
     var toggleAIButtonDOM = getDOMElem("#toggle-ai");
     toggleAIButtonDOM.style.color = ACTIVE_BUTTON_COLOR;
 }
-function fillTileDOM(row, col, selector) {
+// Fills some tile in some grid, for example the main grid, the next preview or holding preview
+function fillTileGenericDOM(row, col, selector) {
     var elemDOM = getTileInDOM(row, col, selector);
     elemDOM.style.backgroundColor = PLACEHOLDER;
 }
-function initHoldBlockDisplayDOM() {
+function initHoldPreviewDisplayDOM() {
     initGenericTable(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
 }
-function initNextBlockDisplayDOM() {
+function initNextPreviewDisplayDOM() {
     initGenericTable(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#next-block");
 }
 // Dynamically generate HTML for a plain grid
 function initGridInDOM() {
     initGenericTable(controller_1.HEIGHT, controller_1.WIDTH, "#grid");
 }
+// Generic function that takes in a selector for a table and fills it with empty table cells
 function initGenericTable(height, width, selector) {
     var elemDOM = getDOMElem(selector);
     for (var row = 0; row < height; row++) {
@@ -680,6 +740,12 @@ function initEventListeners() {
     getDOMElem("#hold").addEventListener("click", function () { return notifyController(4 /* Hold */, null); });
     getDOMElem("#reset").addEventListener("click", function () { return location.reload(); });
     getDOMElem("#toggle-ai").addEventListener("click", toggleAI);
+    getDOMElem("#speed-toggle").addEventListener("change", updateSpeed);
+}
+function updateSpeed(event) {
+    var speedSlider = event.target;
+    var newVal = speedSlider.value;
+    notifyController(6 /* ChangeSpeed */, parseInt(newVal));
 }
 function toggleAI(event) {
     var toggleAIButtonDOM = event.target;
@@ -730,7 +796,7 @@ function createEmptyRowInDOM(length) {
 function createEmptyTileInDOM() {
     var newTile = document.createElement("td");
     newTile.className = "tile";
-    newTile.style.backgroundColor = WALL_COLOR;
+    newTile.style.backgroundColor = GRID_BACKGROUND_COLOR;
     return newTile;
 }
 function getTileInDOM(row, col, selector) {
