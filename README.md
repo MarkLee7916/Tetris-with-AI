@@ -4,7 +4,7 @@ Rebuilding my Tetris Game in TypeScript, now with an AI <br>
 <br>
 
 Tooling: <br>
-To get bundle.js I compiled my .ts files to .js files, and then bundled together using browserify
+To get bundle.js I compiled my .ts files to .js files, and then bundled together using browserify <br>
 I haven't included my package.json because the project has no dependencies
 
 Controls: <br>
@@ -17,3 +17,4 @@ TODO:<br>
 Add screen controls for mobile users<br>
 Add help modal for controls<br>
 Allow AI to hold pieces<br>
+Fix formatting on phone (probably by removing the hold button)
