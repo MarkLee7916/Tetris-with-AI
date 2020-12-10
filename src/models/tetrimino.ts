@@ -13,24 +13,32 @@ export class Tetrimino {
 
     // The number of tiles in a tetrimino
     public static readonly TILE_COUNT = 4;
-    
+
+    // Allows us consistently act on the same block (i.e keeping block the same colour)
+    private readonly ID;
+
     constructor() {
         this.dimensions = randomItemFromArray(blockTypes);
         this.rotationIndex = randomIntBetween(0, Tetrimino.ROTATION_TYPES);
+        this.ID = randomIntBetween(0, Tetrimino.ROTATION_TYPES * Tetrimino.TILE_COUNT);
     }
 
     public nextRotation() {
-		if (this.rotationIndex === Tetrimino.ROTATION_TYPES - 1)
-			this.rotationIndex = 0;
-		else
-			this.rotationIndex++;
+        if (this.rotationIndex === Tetrimino.ROTATION_TYPES - 1)
+            this.rotationIndex = 0;
+        else
+            this.rotationIndex++;
     }
-    
+
     public prevRotation() {
-		if (this.rotationIndex === 0)
-			this.rotationIndex = Tetrimino.ROTATION_TYPES - 1;
-		else
-			this.rotationIndex--;
+        if (this.rotationIndex === 0)
+            this.rotationIndex = Tetrimino.ROTATION_TYPES - 1;
+        else
+            this.rotationIndex--;
+    }
+
+    public getID() {
+        return this.ID;
     }
 
     // Return list of coordinates in tetrimino, where a coordinate is a row col pair 
@@ -48,5 +56,5 @@ export class Tetrimino {
         const currentBlock = this.dimensions[this.rotationIndex];
 
         return currentBlock[index][1];
-    } 
+    }
 }

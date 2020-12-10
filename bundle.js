@@ -50,7 +50,7 @@ var running = true;
             switch (_a.label) {
                 case 0:
                     view_1.initView(readMessageFromView);
-                    game_1.initGame((readMessageFromGame));
+                    game_1.initGame(readMessageFromGame);
                     _a.label = 1;
                 case 1:
                     if (!running) return [3 /*break*/, 3];
@@ -127,20 +127,20 @@ function updateDelayTimeInGame(content) {
     game_1.updateDelayTime(newTime);
 }
 function fillNextBlockTileInView(content) {
-    var tile = content;
-    view_1.fillNextPreviewTileDOM(tile);
+    var placementInfo = content;
+    view_1.fillNextPreviewTileDOM(placementInfo);
 }
 function fillHoldBlockTileInView(content) {
-    var tile = content;
-    view_1.fillHoldPreviewTileDOM(tile);
+    var placementInfo = content;
+    view_1.fillHoldPreviewTileDOM(placementInfo);
 }
 function replaceRowInView(content) {
     var row = content;
     view_1.replaceGridRowDOM(row);
 }
 function renderCoordInView(content) {
-    var renderCoords = content;
-    view_1.fillGridTileDOM(renderCoords);
+    var placementInfo = content;
+    view_1.fillGridTileDOM(placementInfo);
 }
 function eraseCoordFromView(content) {
     var eraseCoords = content;
@@ -330,22 +330,22 @@ function makeCurrTetriminoFall() {
     });
 }
 // Rotate the tetrimino, handling failure cases
-function rotateTetrimino(tet) {
-    renderClearTetrimino(tet);
-    tet.nextRotation();
-    if (!noCollisions(tet, currRow, currCol)) {
-        tet.prevRotation();
+function rotateTetrimino(tetrimino) {
+    renderClearTetrimino(tetrimino);
+    tetrimino.nextRotation();
+    if (!noCollisions(tetrimino, currRow, currCol)) {
+        tetrimino.prevRotation();
     }
-    renderTetrimino(tet);
+    renderTetrimino(tetrimino);
 }
-function moveTetriminoLeft(tet) {
-    moveTetrimino(0, -1, function (i) { return tet.colAt(i) + currCol <= 0; }, tet);
+function moveTetriminoLeft(tetrimino) {
+    moveTetrimino(0, -1, tetrimino);
 }
-function moveTetriminoRight(tet) {
-    moveTetrimino(0, 1, function (i) { return tet.colAt(i) + currCol >= controller_1.WIDTH - 1; }, tet);
+function moveTetriminoRight(tetrimino) {
+    moveTetrimino(0, 1, tetrimino);
 }
-function moveTetriminoDown(tet) {
-    moveTetrimino(1, 0, function (i) { return tet.rowAt(i) + currRow >= controller_1.HEIGHT - 1; }, tet);
+function moveTetriminoDown(tetrimino) {
+    moveTetrimino(1, 0, tetrimino);
 }
 // Return the column and rotation of the best move we can make with the given tetriminoo
 function computeOptimalMove(tet) {
@@ -430,25 +430,24 @@ function renderHoldPreview() {
     notifyController(5 /* ClearHoldBlock */, null);
     holdingTetrimino.tiles().forEach(function (_a) {
         var row = _a[0], col = _a[1];
-        notifyController(3 /* FillHoldTile */, [row, col]);
+        notifyController(3 /* FillHoldTile */, [row, col, holdingTetrimino.getID()]);
     });
 }
 // Return true if the given tetrimino doesn't go out of bounds or overlap with another tetrimino
 function noCollisions(tetrimino, row, col) {
-    return canMoveTetrimino(0, 0, function (i) { return tetrimino.rowAt(i) + row >= controller_1.HEIGHT
-        || tetrimino.colAt(i) + col < 0 || tetrimino.colAt(i) + col >= controller_1.WIDTH; }, tetrimino, row, col);
+    return canMoveTetrimino(0, 0, tetrimino, row, col);
 }
 // Tell the controller to update the next preview with the next tetrimino
 function renderNextPreview() {
     notifyController(4 /* ClearNextBlock */, null);
     nextTetrimino.tiles().forEach(function (_a) {
         var row = _a[0], col = _a[1];
-        notifyController(2 /* FillNextBlockTile */, [row, col]);
+        notifyController(2 /* FillNextBlockTile */, [row, col, nextTetrimino.getID()]);
     });
 }
 // Move tetrimino, handling error case
-function moveTetrimino(rowMove, colMove, edgeGridCondition, tet) {
-    if (canMoveTetrimino(rowMove, colMove, edgeGridCondition, tet, currRow, currCol)) {
+function moveTetrimino(rowMove, colMove, tet) {
+    if (canMoveTetrimino(rowMove, colMove, tet, currRow, currCol)) {
         shiftTetrimino(rowMove, colMove, tet);
     }
 }
@@ -474,12 +473,12 @@ function renderClearTile(row, col) {
 function renderTetrimino(tetrimino) {
     tetrimino.tiles().forEach(function (_a) {
         var row = _a[0], col = _a[1];
-        renderTile(row + currRow, col + currCol);
+        renderTile(row + currRow, col + currCol, tetrimino.getID());
     });
 }
 // Tell the controller to render a tile in the grid
-function renderTile(row, col) {
-    notifyController(1 /* FillGridTile */, [row, col]);
+function renderTile(row, col, ID) {
+    notifyController(1 /* FillGridTile */, [row, col, ID]);
 }
 // Update the grid backend with a tetriminos position
 function updateGridWithTetrimino(tetrimino) {
@@ -513,25 +512,22 @@ function clearLine(row) {
     grid_1.clearRow(row);
     renderClearRow(row);
 }
-function canMoveTetrimino(rowMove, colMove, edgeGridCondition, tetrimino, row, col) {
-    for (var i = 0; i < tetrimino_1.Tetrimino.TILE_COUNT; i++) {
-        if (edgeGridCondition(i)) {
-            return false;
-        }
-        if (grid_1.isFilledAt(tetrimino.rowAt(i) + row + rowMove, tetrimino.colAt(i) + col + colMove)) {
-            return false;
-        }
-    }
-    return true;
+function canMoveTetrimino(rowMove, colMove, tetrimino, row, col) {
+    return tetrimino.tiles().every(function (_a) {
+        var tetRow = _a[0], tetCol = _a[1];
+        var outOfBounds = grid_1.isOutOfBounds(tetRow + row + rowMove, tetCol + col + colMove);
+        var collidesWithOtherBlocks = grid_1.isFilledAt(tetRow + row + rowMove, tetCol + col + colMove);
+        return !outOfBounds && !collidesWithOtherBlocks;
+    });
 }
 function canMoveTetriminoDown(tetrimino, row, col) {
-    return canMoveTetrimino(1, 0, function (i) { return tetrimino.rowAt(i) + row >= controller_1.HEIGHT - 1; }, tetrimino, row, col);
+    return canMoveTetrimino(1, 0, tetrimino, row, col);
 }
 
 },{"../controllers/controller":1,"../utils":6,"./grid":4,"./tetrimino":5}],4:[function(require,module,exports){
 "use strict";
 exports.__esModule = true;
-exports.fillAt = exports.isFilledAt = exports.clearRow = exports.initEmptyGrid = void 0;
+exports.isOutOfBounds = exports.fillAt = exports.isFilledAt = exports.clearRow = exports.initEmptyGrid = void 0;
 var controller_1 = require("../controllers/controller");
 var grid = [];
 function initEmptyGrid() {
@@ -551,16 +547,25 @@ function clearRow(row) {
 }
 exports.clearRow = clearRow;
 function isFilledAt(row, col) {
-    return grid[row][col];
+    if (isOutOfBounds(row, col)) {
+        return false;
+    }
+    else {
+        return grid[row][col];
+    }
 }
 exports.isFilledAt = isFilledAt;
 function fillAt(row, col) {
-    if (row < 0 || col < 0 || row >= controller_1.HEIGHT || col >= controller_1.WIDTH) {
+    if (isOutOfBounds(row, col)) {
         throw "Invalid arguments, must be within bounds of grid. Supplied args were row: " + row + " col: " + col;
     }
     grid[row][col] = true;
 }
 exports.fillAt = fillAt;
+function isOutOfBounds(row, col) {
+    return row < 0 || col < 0 || row >= controller_1.HEIGHT || col >= controller_1.WIDTH;
+}
+exports.isOutOfBounds = isOutOfBounds;
 
 },{"../controllers/controller":1}],5:[function(require,module,exports){
 "use strict";
@@ -572,6 +577,7 @@ var Tetrimino = /** @class */ (function () {
     function Tetrimino() {
         this.dimensions = utils_1.randomItemFromArray(blockTypes_1.blockTypes);
         this.rotationIndex = utils_1.randomIntBetween(0, Tetrimino.ROTATION_TYPES);
+        this.ID = utils_1.randomIntBetween(0, Tetrimino.ROTATION_TYPES * Tetrimino.TILE_COUNT);
     }
     Tetrimino.prototype.nextRotation = function () {
         if (this.rotationIndex === Tetrimino.ROTATION_TYPES - 1)
@@ -584,6 +590,9 @@ var Tetrimino = /** @class */ (function () {
             this.rotationIndex = Tetrimino.ROTATION_TYPES - 1;
         else
             this.rotationIndex--;
+    };
+    Tetrimino.prototype.getID = function () {
+        return this.ID;
     };
     // Return list of coordinates in tetrimino, where a coordinate is a row col pair 
     Tetrimino.prototype.tiles = function () {
@@ -611,7 +620,7 @@ exports.__esModule = true;
 exports.wait = exports.randomItemFromArray = exports.randomIntBetween = void 0;
 // Generates a random integer whose value lies between lower and upper
 function randomIntBetween(lower, upper) {
-    return Math.floor(seededRandom() * (upper - lower)) + lower;
+    return Math.floor(Math.random() * (upper - lower)) + lower;
 }
 exports.randomIntBetween = randomIntBetween;
 function randomItemFromArray(array) {
@@ -624,12 +633,6 @@ function wait(delayTime) {
     });
 }
 exports.wait = wait;
-var seed = 6;
-// A deteriministic random number generator, used only in development
-function seededRandom() {
-    var x = Math.sin(seed++) * 10000;
-    return x - Math.floor(x);
-}
 
 },{}],7:[function(require,module,exports){
 "use strict";
@@ -637,10 +640,10 @@ exports.__esModule = true;
 exports.gameOverMessage = exports.fillHoldPreviewTileDOM = exports.fillNextPreviewTileDOM = exports.clearHoldPreviewDOM = exports.clearNextPreviewDOM = exports.replaceGridRowDOM = exports.fillGridTileDOM = exports.eraseGridTileDOM = exports.initView = void 0;
 var controller_1 = require("../controllers/controller");
 var GRID_BACKGROUND_COLOR = "white";
-var PLACEHOLDER = "pink";
 var ACTIVE_BUTTON_COLOR = "#7FDBFF";
 var DEFAULT_BUTTON_COLOR = "white";
 var PREVIEW_DISPLAY_SIZE = 4;
+var colors = Object.freeze(["#001f3f", "#0074D9", "#7FDBFF", "#39CCCC", "#FF4136", "#FFDC00"]);
 var notifyController;
 var lineClears = 0;
 function initView(notif) {
@@ -661,8 +664,8 @@ function eraseGridTileDOM(_a) {
 exports.eraseGridTileDOM = eraseGridTileDOM;
 // Set a grid tile to some tetrimino color
 function fillGridTileDOM(_a) {
-    var row = _a[0], col = _a[1];
-    fillTileGenericDOM(row, col, "#grid");
+    var row = _a[0], col = _a[1], ID = _a[2];
+    fillTileGenericDOM(row, col, ID, "#grid");
 }
 exports.fillGridTileDOM = fillGridTileDOM;
 // Get rid of the row and place an empty one on top, simulating a line clear
@@ -682,13 +685,13 @@ function clearHoldPreviewDOM() {
 }
 exports.clearHoldPreviewDOM = clearHoldPreviewDOM;
 function fillNextPreviewTileDOM(_a) {
-    var row = _a[0], col = _a[1];
-    fillTileGenericDOM(row, col, "#next-block");
+    var row = _a[0], col = _a[1], ID = _a[2];
+    fillTileGenericDOM(row, col, ID, "#next-block");
 }
 exports.fillNextPreviewTileDOM = fillNextPreviewTileDOM;
 function fillHoldPreviewTileDOM(_a) {
-    var row = _a[0], col = _a[1];
-    fillTileGenericDOM(row, col, "#hold-block");
+    var row = _a[0], col = _a[1], ID = _a[2];
+    fillTileGenericDOM(row, col, ID, "#hold-block");
 }
 exports.fillHoldPreviewTileDOM = fillHoldPreviewTileDOM;
 function gameOverMessage() {
@@ -714,9 +717,12 @@ function initStyles() {
     toggleAIButtonDOM.style.color = ACTIVE_BUTTON_COLOR;
 }
 // Fills some tile in some grid, for example the main grid, the next preview or holding preview
-function fillTileGenericDOM(row, col, selector) {
+function fillTileGenericDOM(row, col, ID, selector) {
     var elemDOM = getTileInDOM(row, col, selector);
-    elemDOM.style.backgroundColor = PLACEHOLDER;
+    elemDOM.style.backgroundColor = getColorFromID(ID);
+}
+function getColorFromID(ID) {
+    return colors[ID % colors.length];
 }
 function initHoldPreviewDisplayDOM() {
     initGenericTable(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");

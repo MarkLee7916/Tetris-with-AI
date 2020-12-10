@@ -1,4 +1,4 @@
-import {initGame, isGameOver, GameMessages, toggleAI, moveCurrTetriminoLeft, updateDelayTime, moveCurrTetriminoRight, hold, rotateCurrTetrimino, moveCurrTetriminoDown, runTurn} from "../models/game";
+import { initGame, isGameOver, GameMessages, toggleAI, moveCurrTetriminoLeft, updateDelayTime, moveCurrTetriminoRight, hold, rotateCurrTetrimino, moveCurrTetriminoDown, runTurn } from "../models/game";
 import { clearHoldPreviewDOM, clearNextPreviewDOM, eraseGridTileDOM, fillHoldPreviewTileDOM, initView, fillGridTileDOM, replaceGridRowDOM, ViewMessages, fillNextPreviewTileDOM, gameOverMessage } from "../views/view";
 
 export const HEIGHT = 20;
@@ -9,15 +9,15 @@ let running = true;
 // Main driver function for program
 (async function runGame() {
     initView(readMessageFromView);
-    initGame((readMessageFromGame));
+    initGame(readMessageFromGame);
 
-	while (running) {
+    while (running) {
         await runTurn();
 
         if (isGameOver()) {
             gameOver();
         }
-    }	
+    }
 })();
 
 // Callback that executes whenever the view wants to talk to the controller
@@ -79,37 +79,37 @@ function readMessageFromGame(message: GameMessages, content: any) {
 }
 
 function updateDelayTimeInGame(content: any) {
-    const newTime = <number> content;
+    const newTime = <number>content;
 
     updateDelayTime(newTime);
 }
 
 function fillNextBlockTileInView(content: any) {
-    const tile = <[number, number]> content;
+    const placementInfo = <[number, number, number]>content;
 
-    fillNextPreviewTileDOM(tile);
+    fillNextPreviewTileDOM(placementInfo);
 }
 
 function fillHoldBlockTileInView(content: any) {
-    const tile = <[number, number]> content;
+    const placementInfo = <[number, number, number]>content;
 
-    fillHoldPreviewTileDOM(tile);
+    fillHoldPreviewTileDOM(placementInfo);
 }
 
 function replaceRowInView(content: any) {
-    const row = <number> content;    
+    const row = <number>content;
 
     replaceGridRowDOM(row);
 }
 
 function renderCoordInView(content: any) {
-    const renderCoords = <[number, number]> content;
-            
-    fillGridTileDOM(renderCoords);
+    const placementInfo = <[number, number, number]>content;
+
+    fillGridTileDOM(placementInfo);
 }
 
 function eraseCoordFromView(content: any) {
-    const eraseCoords = <[number, number]> content;
+    const eraseCoords = <[number, number]>content;
 
     eraseGridTileDOM(eraseCoords);
 }

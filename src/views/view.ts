@@ -12,10 +12,10 @@ export const enum ViewMessages {
 }
 
 const GRID_BACKGROUND_COLOR = "white";
-const PLACEHOLDER = "pink";
 const ACTIVE_BUTTON_COLOR = "#7FDBFF";
 const DEFAULT_BUTTON_COLOR = "white";
 const PREVIEW_DISPLAY_SIZE = 4;
+const colors = Object.freeze(["#001f3f", "#0074D9", "#7FDBFF", "#39CCCC", "#FF4136", "#FFDC00"]);
 
 let notifyController: (message: ViewMessages, content: any) => void;
 let lineClears = 0;
@@ -38,13 +38,13 @@ export function eraseGridTileDOM([row, col]: [number, number]) {
 }
 
 // Set a grid tile to some tetrimino color
-export function fillGridTileDOM([row, col]: [number, number]) {
-    fillTileGenericDOM(row, col, "#grid");
+export function fillGridTileDOM([row, col, ID]: [number, number, number]) {
+    fillTileGenericDOM(row, col, ID, "#grid");
 }
 
 // Get rid of the row and place an empty one on top, simulating a line clear
 export function replaceGridRowDOM(row: number) {
-    const gridDOM = <HTMLTableElement> getDOMElem("#grid");
+    const gridDOM = <HTMLTableElement>getDOMElem("#grid");
 
     gridDOM.deleteRow(row);
     gridDOM.insertBefore(createEmptyRowInDOM(WIDTH), gridDOM.rows[0]);
@@ -59,12 +59,12 @@ export function clearHoldPreviewDOM() {
     clearGridGenericDOM(PREVIEW_DISPLAY_SIZE, PREVIEW_DISPLAY_SIZE, "#hold-block");
 }
 
-export function fillNextPreviewTileDOM([row, col]: [number, number]) {
-    fillTileGenericDOM(row, col, "#next-block");
+export function fillNextPreviewTileDOM([row, col, ID]: [number, number, number]) {
+    fillTileGenericDOM(row, col, ID, "#next-block");
 }
 
-export function fillHoldPreviewTileDOM([row, col]: [number, number]) {
-    fillTileGenericDOM(row, col, "#hold-block");
+export function fillHoldPreviewTileDOM([row, col, ID]: [number, number, number]) {
+    fillTileGenericDOM(row, col, ID, "#hold-block");
 }
 
 export function gameOverMessage() {
@@ -73,7 +73,7 @@ export function gameOverMessage() {
 
 function updateLineClearCounter() {
     const lineClearCounter = getDOMElem("#line-clears");
-    
+
     lineClearCounter.innerHTML = `Line Clears: ${++lineClears}`
 }
 
@@ -90,16 +90,20 @@ function clearGridGenericDOM(height: number, width: number, selector: string) {
 
 // Initialse default styling for some components
 function initStyles() {
-    const toggleAIButtonDOM = <HTMLButtonElement> getDOMElem("#toggle-ai");
+    const toggleAIButtonDOM = <HTMLButtonElement>getDOMElem("#toggle-ai");
 
     toggleAIButtonDOM.style.color = ACTIVE_BUTTON_COLOR;
 }
 
 // Fills some tile in some grid, for example the main grid, the next preview or holding preview
-function fillTileGenericDOM(row: number, col: number, selector: string) {
+function fillTileGenericDOM(row: number, col: number, ID: number, selector: string) {
     const elemDOM = getTileInDOM(row, col, selector)
 
-    elemDOM.style.backgroundColor = PLACEHOLDER;
+    elemDOM.style.backgroundColor = getColorFromID(ID);
+}
+
+function getColorFromID(ID: number) {
+    return colors[ID % colors.length];
 }
 
 function initHoldPreviewDisplayDOM() {
@@ -119,9 +123,9 @@ function initGridInDOM() {
 function initGenericTable(height: number, width: number, selector: string) {
     const elemDOM = getDOMElem(selector);
 
-	for (let row = 0; row < height; row++) {
-		elemDOM.append(createEmptyRowInDOM(width));
-	}
+    for (let row = 0; row < height; row++) {
+        elemDOM.append(createEmptyRowInDOM(width));
+    }
 }
 
 function initEventListeners() {
@@ -134,14 +138,14 @@ function initEventListeners() {
 }
 
 function updateSpeed(event: Event) {
-    const speedSlider = <HTMLButtonElement> event.target;
+    const speedSlider = <HTMLButtonElement>event.target;
     const newVal = speedSlider.value;
 
     notifyController(ViewMessages.ChangeSpeed, parseInt(newVal));
 }
 
 function toggleAI(event: Event) {
-    const toggleAIButtonDOM = <HTMLButtonElement> event.target;
+    const toggleAIButtonDOM = <HTMLButtonElement>event.target;
 
     toggleButtonColor(toggleAIButtonDOM);
     notifyController(ViewMessages.ToggleAI, null);
@@ -157,54 +161,54 @@ function toggleButtonColor(toggleAIButtonDOM: HTMLButtonElement) {
 
 // Map key press onto action
 function dealWithKeyPress(keyPress: KeyboardEvent) {
-	const leftArrow = 37;
-	const upArrow = 38;
-	const rightArrow = 39;
+    const leftArrow = 37;
+    const upArrow = 38;
+    const rightArrow = 39;
     const downArrow = 40;
     const holdKey = 72;
 
-	switch (keyPress.keyCode) {
-		case upArrow:
-			notifyController(ViewMessages.Rotate, null);
-			break;
-		case leftArrow:
-			notifyController(ViewMessages.MoveLeft, null);
-			break;
-		case rightArrow:
-			notifyController(ViewMessages.MoveRight, null);
-			break;
-		case downArrow:
-			notifyController(ViewMessages.MoveDown, null);
+    switch (keyPress.keyCode) {
+        case upArrow:
+            notifyController(ViewMessages.Rotate, null);
+            break;
+        case leftArrow:
+            notifyController(ViewMessages.MoveLeft, null);
+            break;
+        case rightArrow:
+            notifyController(ViewMessages.MoveRight, null);
+            break;
+        case downArrow:
+            notifyController(ViewMessages.MoveDown, null);
             break;
         case holdKey:
             notifyController(ViewMessages.Hold, null);
             break;
-	}
+    }
 }
 
 function createEmptyRowInDOM(length: number) {
     const newRow = document.createElement("tr");
-    
-	newRow.className = "row";
 
-	for (let col = 0; col < length; col++)  {        
-		newRow.append(createEmptyTileInDOM());
-	}
+    newRow.className = "row";
 
-	return newRow;
+    for (let col = 0; col < length; col++) {
+        newRow.append(createEmptyTileInDOM());
+    }
+
+    return newRow;
 }
 
 function createEmptyTileInDOM() {
-	const newTile = document.createElement("td");
+    const newTile = document.createElement("td");
 
-	newTile.className = "tile";
-	newTile.style.backgroundColor = GRID_BACKGROUND_COLOR;
+    newTile.className = "tile";
+    newTile.style.backgroundColor = GRID_BACKGROUND_COLOR;
 
-	return newTile;
+    return newTile;
 }
 
 function getTileInDOM(row: number, col: number, selector: string) {
-    const gridDOM = <HTMLTableElement> getDOMElem(selector);
+    const gridDOM = <HTMLTableElement>getDOMElem(selector);
     const rowDOM = rowDOMAt(gridDOM, row);
     const tileDOM = colDOMAt(rowDOM, col);
 
@@ -233,6 +237,6 @@ function getDOMElem(selector: string) {
     if (elemDOM === null) {
         throw `Selector ${selector} wasn't found in index.html`;
     } else {
-        return <Element> elemDOM;
+        return <Element>elemDOM;
     }
 }
