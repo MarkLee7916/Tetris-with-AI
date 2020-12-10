@@ -1,75 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <title>Tetris</title>
-    <meta charset="utfc8" />
-    <link rel="stylesheet" href="index.css" />
-  </head>
 
-  <body>
-    <div id="page">
-      <header>
-        <nav>
-          <ul id="menu">
-            <span class="menu-segment">
-              <button class="menu-button" id="reset">Reset</button>
-            </span>
+<head>
+  <title>Tetris</title>
+  <meta charset="utfc8" />
+  <link rel="stylesheet" href="index.css" />
+</head>
 
-            <span class="menu-segment">
-              <button class="menu-button" id="hold">Hold Block</button>
-            </span>
+<body>
+  <div id="page">
+    <header>
+      <nav>
+        <ul id="menu">
+          <span class="menu-segment">
+            <button class="menu-button" id="reset">Reset</button>
+          </span>
 
-            <span class="menu-segment">
-              <button class="menu-button" id="toggle-ai">Toggle AI</button>
-            </span>
+          <span class="menu-segment">
+            <button class="menu-button" id="toggle-ai">Toggle AI</button>
+          </span>
 
-            <span class="menu-segment">
-              <span class="menu-text" id="line-clears">Line Clears: 0</span>
-            </span>
+          <span class="menu-segment">
+            <span class="menu-text" id="line-clears">Line Clears: 0</span>
+          </span>
 
-            <span class="menu-segment">
-              <label for="speed-toggle" class="menu-text">Toggle Speed</label>
-              <input
-                type="range"
-                min="0"
-                max="1000"
-                value="500"
-                id="speed-toggle"
-              />
-            </span>
-          </ul>
-        </nav>
-      </header>
+          <span class="menu-segment">
+            <label for="speed-toggle" class="menu-text">Toggle Speed</label>
+            <input type="range" min="0" max="1000" value="500" id="speed-toggle" />
+          </span>
+        </ul>
+      </nav>
+    </header>
 
-      <div id="game">
-        <table
-          id="hold-block"
-          class="preview-block"
-          align="center"
-          height="200px"
-          width="200px"
-        >
-          <caption id="hold-block-caption">
-            Hold
-          </caption>
-        </table>
+    <div id="game">
+      <table id="hold-block" class="preview-block" align="center" height="200px" width="200px">
+        <caption id="hold-block-caption">
+          Hold
+        </caption>
+      </table>
 
-        <table id="grid" align="center" height="600px" width="600px"></table>
+      <table id="grid" align="center" height="600px" width="600px"></table>
 
-        <table
-          id="next-block"
-          class="preview-block"
-          align="center"
-          height="200px"
-          width="200px"
-        >
-          <caption id="next-block-caption">
-            Next Block
-          </caption>
-        </table>
-      </div>
+      <table id="next-block" class="preview-block" align="center" height="200px" width="200px">
+        <caption id="next-block-caption">
+          Next Block
+        </caption>
+      </table>
     </div>
-  </body>
+  </div>
+</body>
 
-  <script src="bundle.js" type="module"></script>
+<script src="bundle.js" type="module"></script>
+
 </html>

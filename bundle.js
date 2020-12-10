@@ -743,7 +743,6 @@ function initGenericTable(height, width, selector) {
 }
 function initEventListeners() {
     document.addEventListener("keydown", dealWithKeyPress);
-    getDOMElem("#hold").addEventListener("click", function () { return notifyController(4 /* Hold */, null); });
     getDOMElem("#reset").addEventListener("click", function () { return location.reload(); });
     getDOMElem("#toggle-ai").addEventListener("click", toggleAI);
     getDOMElem("#speed-toggle").addEventListener("change", updateSpeed);

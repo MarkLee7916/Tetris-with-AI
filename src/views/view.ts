@@ -131,7 +131,6 @@ function initGenericTable(height: number, width: number, selector: string) {
 function initEventListeners() {
     document.addEventListener("keydown", dealWithKeyPress);
 
-    getDOMElem("#hold").addEventListener("click", () => notifyController(ViewMessages.Hold, null));
     getDOMElem("#reset").addEventListener("click", () => location.reload());
     getDOMElem("#toggle-ai").addEventListener("click", toggleAI);
     getDOMElem("#speed-toggle").addEventListener("change", updateSpeed);
